@@ -22,9 +22,14 @@ import {
   GraduationCap,
   Sparkles,
   Users,
+  Download,
+  CalendarPlus,
+  Layers,
 } from 'lucide-react';
 import { Badge } from '../../UI/Badge.tsx';
 import { Modal } from '../../UI/Modal.tsx';
+import { CourseSyllabusModal } from './CourseSyllabusModal.tsx';
+import { generateGoogleCalendarUrl, downloadIcsFile } from '../../../utils/calendarSync.ts';
 
 export const CoursesModule: React.FC = () => {
   const { user, role, hasPermission } = useAuth();
@@ -38,6 +43,8 @@ export const CoursesModule: React.FC = () => {
   const [isAddAssignmentModalOpen, setIsAddAssignmentModalOpen] = useState(false);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [isViewSubmissionsModalOpen, setIsViewSubmissionsModalOpen] = useState(false);
+  const [isSyllabusModalOpen, setIsSyllabusModalOpen] = useState(false);
+  const [selectedCourseForSyllabus, setSelectedCourseForSyllabus] = useState<Course | null>(null);
 
   // Selected items
   const [selectedAssignment, setSelectedAssignment] = useState<CourseAssignment | null>(null);
@@ -211,6 +218,27 @@ export const CoursesModule: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => {
+              // Generate bulk iCal download for all 8 courses
+              downloadIcsFile({
+                filename: 'Jadwal_Kuliah_01SAKP014.ics',
+                title: 'Jadwal Kuliah Semester 1 Kelas 01SAKP014',
+                events: courses.map(c => ({
+                  title: `[Kuliah] ${c.name} (${c.code})`,
+                  details: `Dosen: ${c.lecturer_name} (${c.lecturer_phone || '-'})\nRuang: ${c.room || '-'}\nSKS: ${c.sks} SKS\nKelas 01SAKP014`,
+                  location: c.room || 'Universitas Pamulang',
+                  startDate: new Date().toISOString(),
+                })),
+              });
+            }}
+            className="px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+            title="Ekspor seluruh jadwal ke file .ics untuk Apple Calendar / Outlook / Google Calendar HP"
+          >
+            <Download className="w-4 h-4 text-emerald-600" />
+            <span>Ekspor Kalender (.ics)</span>
+          </button>
+
           {hasPermission('create_courses') && (
             <button
               onClick={() => setIsAddCourseModalOpen(true)}
@@ -320,20 +348,34 @@ export const CoursesModule: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                  {waNumber ? (
-                    <a
-                      href={waUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    {waNumber ? (
+                      <a
+                        href={waUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-semibold rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>WA Dosen</span>
+                      </a>
+                    ) : (
+                      <span className="text-[11px] text-slate-400">No WA belum ada</span>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        setSelectedCourseForSyllabus(course);
+                        setIsSyllabusModalOpen(true);
+                      }}
+                      className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                      title="Lihat Silabus perkuliahan dan dokumen RPS"
                     >
-                      <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Chat Dosen</span>
-                    </a>
-                  ) : (
-                    <span className="text-[11px] text-slate-400">Kontak WA belum diisi</span>
-                  )}
+                      <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Silabus & RPS</span>
+                    </button>
+                  </div>
 
                   <button
                     onClick={() => {
@@ -807,6 +849,16 @@ export const CoursesModule: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Silabus & RPS Modal */}
+      <CourseSyllabusModal
+        isOpen={isSyllabusModalOpen}
+        onClose={() => {
+          setIsSyllabusModalOpen(false);
+          setSelectedCourseForSyllabus(null);
+        }}
+        course={selectedCourseForSyllabus}
+      />
     </div>
   );
 };

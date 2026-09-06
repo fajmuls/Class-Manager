@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext.tsx';
 import { api } from '../../../services/api.ts';
+import { RoleClaimApprovalPanel } from '../../Admin/RoleClaimApprovalPanel.tsx';
 import {
   Settings,
   Save,
@@ -13,10 +14,20 @@ import {
   GraduationCap,
   Tag,
   ShieldCheck,
+  Send,
+  Bell,
+  MessageSquare,
+  Bot,
+  Zap,
+  Globe,
+  Smartphone,
+  Layers,
+  Plus,
+  CalendarCheck,
 } from 'lucide-react';
 
 export const SettingsModule: React.FC = () => {
-  const { classInfo, setClassInfo, hasPermission } = useAuth();
+  const { classInfo, setClassInfo, hasPermission, allUsers, switchUser, role, isSuperAdmin } = useAuth();
   const [formData, setFormData] = useState({
     name: classInfo?.name || 'Teknik Informatika 2024 - Kelas A',
     code: classInfo?.code || 'TI-24A',
@@ -31,14 +42,119 @@ export const SettingsModule: React.FC = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // App version according to user instruction
-  const APP_VERSION = 'v2.1.0';
+  const APP_VERSION = 'v2.5.0';
   const BUILD_DATE = '6 September 2026';
+
+  // Semester Management
+  const [semesters, setSemesters] = useState<any[]>([]);
+  const [newSemesterName, setNewSemesterName] = useState('');
+  const [newAcademicYear, setNewAcademicYear] = useState('2026/2027');
+  const [isAddingSemester, setIsAddingSemester] = useState(false);
+
+  // Webhook and Bot Config State
+  const [webhookConfig, setWebhookConfig] = useState({
+    webhook_url: '',
+    telegram_bot_token: '',
+    telegram_chat_id: '',
+    whatsapp_gateway_url: '',
+    is_active: true,
+    notify_announcements: true,
+    notify_assignments: true,
+    notify_kas_bills: true,
+    notify_meetings: true,
+  });
+  const [isSavingWebhook, setIsSavingWebhook] = useState(false);
+  const [isTestingWebhook, setIsTestingWebhook] = useState(false);
+  const [webhookSuccess, setWebhookSuccess] = useState(false);
 
   const [isRoleSwitcherActive, setIsRoleSwitcherActive] = useState<boolean>(() => {
     return localStorage.getItem('cms_show_role_switcher') === 'true';
   });
 
-  const { allUsers, switchUser, role } = useAuth();
+  useEffect(() => {
+    loadWebhookSettings();
+    loadSemesters();
+  }, []);
+
+  const loadSemesters = async () => {
+    try {
+      const list = await api.getSemesters();
+      setSemesters(list);
+    } catch (err) {
+      console.error('Error loading semesters:', err);
+    }
+  };
+
+  const handleSetActiveSemester = async (id: string) => {
+    try {
+      await api.setActiveSemester(id);
+      await loadSemesters();
+      const me = await api.getMe();
+      if (me.classInfo) setClassInfo(me.classInfo);
+      alert('Semester aktif berhasil diubah!');
+    } catch (err: any) {
+      alert(err.message || 'Gagal mengubah semester aktif');
+    }
+  };
+
+  const handleAddSemester = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSemesterName.trim()) return;
+    try {
+      setIsAddingSemester(true);
+      await api.addSemester({
+        name: newSemesterName.trim(),
+        academic_year: newAcademicYear.trim(),
+      });
+      setNewSemesterName('');
+      await loadSemesters();
+      alert('Semester baru berhasil ditambahkan!');
+    } catch (err: any) {
+      alert(err.message || 'Gagal menambahkan semester');
+    } finally {
+      setIsAddingSemester(false);
+    }
+  };
+
+  const loadWebhookSettings = async () => {
+    try {
+      const cfg = await api.getWebhookConfig();
+      if (cfg) {
+        setWebhookConfig(cfg);
+      }
+    } catch (err) {
+      console.error('Error loading webhook config:', err);
+    }
+  };
+
+  const handleSaveWebhook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsSavingWebhook(true);
+      const updated = await api.updateWebhookConfig(webhookConfig);
+      setWebhookConfig(updated);
+      setWebhookSuccess(true);
+      setTimeout(() => setWebhookSuccess(false), 3000);
+    } catch (err: any) {
+      alert(err.message || 'Gagal menyimpan konfigurasi webhook');
+    } finally {
+      setIsSavingWebhook(false);
+    }
+  };
+
+  const handleTestWebhook = async () => {
+    try {
+      setIsTestingWebhook(true);
+      const res = await api.testWebhook(
+        '🔔 [TES SISTEM CMS] Integrasi Bot WhatsApp & Telegram Kelas berhasil terhubung! Notifikasi deadline dan kas siap disalurkan.'
+      );
+      alert('✓ Sinyal notifikasi webhook & bot berhasil dikirim! Silakan periksa log saluran komunikasi kelas.');
+    } catch (err: any) {
+      alert(err.message || 'Gagal menguji webhook');
+    } finally {
+      setIsTestingWebhook(false);
+    }
+  };
 
   const handleToggleRoleSwitcher = () => {
     const nextState = !isRoleSwitcherActive;
@@ -80,15 +196,15 @@ export const SettingsModule: React.FC = () => {
       {/* Header */}
       <div>
         <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-          <Settings className="w-5 h-5 text-blue-600" /> Pengaturan Kelas & Versi Sistem
+          <Settings className="w-5 h-5 text-blue-600" /> Pengaturan Kelas, Bot & Versi Sistem
         </h2>
         <p className="text-xs text-slate-500 mt-1">
-          Konfigurasi metadata kelas perkuliahan, identitas universitas, dosen pembimbing, serta pembaruan versi aplikasi.
+          Konfigurasi metadata kelas perkuliahan, integrasi bot notifikasi WhatsApp/Telegram, panel admin, serta pembaruan versi aplikasi.
         </p>
       </div>
 
       {/* App Version Card (Required by custom instruction) */}
-      <div className="p-6 bg-[#0F172A] rounded-xl text-white shadow-sm border border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="p-6 bg-[#0F172A] rounded-2xl text-white shadow-sm border border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-wider">
@@ -97,9 +213,9 @@ export const SettingsModule: React.FC = () => {
             <span className="text-lg font-mono font-bold text-indigo-300">{APP_VERSION}</span>
             <span className="text-xs text-slate-400">({BUILD_DATE})</span>
           </div>
-          <h3 className="text-base font-bold text-white">Class Management System (CMS Pro)</h3>
+          <h3 className="text-base font-bold text-white">Class Management System (CMS Pro 01SAKP014)</h3>
           <p className="text-xs text-slate-300">
-            Arsitektur RBAC Granular, Multi-Role Dashboard, Tema Professional Polish, Transparansi Kas Terbuka.
+            Dukungan PWA Offline, 8 Silabus Perkuliahan & Kontak Dosen, Otomatisasi Webhook/Bot, Payment Gateway VA/QRIS, dan Ekspor Kalender iCal.
           </p>
         </div>
 
@@ -109,6 +225,168 @@ export const SettingsModule: React.FC = () => {
           </span>
         </div>
       </div>
+
+      {/* Webhook WhatsApp / Telegram Integration Panel */}
+      <form
+        onSubmit={handleSaveWebhook}
+        className="p-6 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-5"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Bot className="w-5 h-5 text-emerald-600" />
+              <h3 className="text-sm font-bold text-slate-900">
+                Integrasi Webhook & Bot Notifikasi (WhatsApp / Telegram)
+              </h3>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Kirimkan pemberitahuan otomatis ke grup kelas saat ada pengumuman, pengingat deadline H-1 tugas, dan tagihan kas baru.
+            </p>
+          </div>
+
+          {webhookSuccess && (
+            <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+              <CheckCircle2 className="w-4 h-4" /> Konfigurasi Bot Tersimpan!
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">
+              WhatsApp Gateway / Webhook URL (Fonnte / Wablas / Discord / Custom)
+            </label>
+            <input
+              type="text"
+              placeholder="https://api.fonnte.com/send atau webhook URL"
+              value={webhookConfig.webhook_url}
+              onChange={(e) => setWebhookConfig({ ...webhookConfig, webhook_url: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500 font-mono text-[11px]"
+            />
+          </div>
+
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">
+              Telegram Bot Token (dari @BotFather)
+            </label>
+            <input
+              type="password"
+              placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+              value={webhookConfig.telegram_bot_token}
+              onChange={(e) => setWebhookConfig({ ...webhookConfig, telegram_bot_token: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500 font-mono text-[11px]"
+            />
+          </div>
+
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">
+              Telegram Chat ID Grup / Channel Kelas
+            </label>
+            <input
+              type="text"
+              placeholder="-1001234567890 atau @GrupKelas01SAKP014"
+              value={webhookConfig.telegram_chat_id}
+              onChange={(e) => setWebhookConfig({ ...webhookConfig, telegram_chat_id: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500 font-mono text-[11px]"
+            />
+          </div>
+
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">
+              Status Bot Notifikasi
+            </label>
+            <div className="flex items-center gap-2 h-10">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={webhookConfig.is_active}
+                  onChange={(e) => setWebhookConfig({ ...webhookConfig, is_active: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                <span className="ml-2 text-xs font-semibold text-slate-700">
+                  {webhookConfig.is_active ? 'Bot Aktif' : 'Bot Dinonaktifkan'}
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Triggers checkboxes */}
+        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
+          <span className="font-bold text-slate-800 block">Pemicu Otomatisasi (Triggers):</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={webhookConfig.notify_announcements}
+                onChange={(e) =>
+                  setWebhookConfig({ ...webhookConfig, notify_announcements: e.target.checked })
+                }
+                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-slate-700 font-medium">Pengumuman Baru Diterbitkan</span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={webhookConfig.notify_assignments}
+                onChange={(e) =>
+                  setWebhookConfig({ ...webhookConfig, notify_assignments: e.target.checked })
+                }
+                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-slate-700 font-medium">Tugas Kuliah & Pengingat Deadline H-1</span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={webhookConfig.notify_kas_bills}
+                onChange={(e) =>
+                  setWebhookConfig({ ...webhookConfig, notify_kas_bills: e.target.checked })
+                }
+                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-slate-700 font-medium">Penerbitan Tagihan Kas & Bukti Kas Baru</span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={webhookConfig.notify_meetings}
+                onChange={(e) =>
+                  setWebhookConfig({ ...webhookConfig, notify_meetings: e.target.checked })
+                }
+                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-slate-700 font-medium">Jadwal Rapat Kelas & Notulen</span>
+            </label>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={handleTestWebhook}
+            disabled={isTestingWebhook}
+            className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <Send className="w-3.5 h-3.5 text-emerald-600" />
+            <span>{isTestingWebhook ? 'Mengirim Sinyal...' : 'Kirim Uji Coba Webhook'}</span>
+          </button>
+
+          <button
+            type="submit"
+            disabled={isSavingWebhook}
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+          >
+            <Save className="w-4 h-4" />
+            <span>{isSavingWebhook ? 'Menyimpan...' : 'Simpan Konfigurasi Bot'}</span>
+          </button>
+        </div>
+      </form>
 
       {/* Form Settings Identitas Kelas */}
       <form onSubmit={handleSave} className="p-6 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-6">
@@ -226,6 +504,107 @@ export const SettingsModule: React.FC = () => {
         </div>
       </form>
 
+      {/* Super Admin Google Account Role Approval Panel */}
+      {(isSuperAdmin || hasPermission('assign_role')) && (
+        <RoleClaimApprovalPanel />
+      )}
+
+      {/* Semester & Academic Year Management */}
+      <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Layers className="w-5 h-5 text-blue-600" />
+              <h3 className="text-sm font-bold text-slate-900">
+                Kelola Semester & Tahun Akademik
+              </h3>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Atur semester yang sedang aktif berjalan dan tambahkan semester baru untuk jadwal perkuliahan.
+            </p>
+          </div>
+        </div>
+
+        {/* Semesters list */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          {semesters.map((sem) => (
+            <div
+              key={sem.id}
+              className={`p-4 rounded-xl border flex flex-col justify-between transition-all ${
+                sem.is_active
+                  ? 'border-blue-500 bg-blue-50/50 shadow-xs'
+                  : 'border-slate-200 bg-white hover:border-slate-300'
+              }`}
+            >
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900 text-xs">{sem.name}</span>
+                  {sem.is_active && (
+                    <span className="px-2 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-bold">
+                      Aktif Sekarang
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-500">Tahun: {sem.academic_year}</p>
+              </div>
+
+              {!sem.is_active && (
+                <button
+                  type="button"
+                  onClick={() => handleSetActiveSemester(sem.id)}
+                  className="mt-3 w-full py-1.5 px-3 bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                >
+                  Jadikan Semester Aktif
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Add semester form */}
+        {hasPermission('manage_system_settings') && (
+          <form
+            onSubmit={handleAddSemester}
+            className="pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end"
+          >
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Nama Semester Baru
+              </label>
+              <input
+                type="text"
+                placeholder="Contoh: Semester 2 (Genap)"
+                value={newSemesterName}
+                onChange={(e) => setNewSemesterName(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Tahun Akademik
+              </label>
+              <input
+                type="text"
+                placeholder="Contoh: 2026/2027"
+                value={newAcademicYear}
+                onChange={(e) => setNewAcademicYear(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-blue-500"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isAddingSemester}
+              className="py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>{isAddingSemester ? 'Menambahkan...' : 'Tambah Semester'}</span>
+            </button>
+          </form>
+        )}
+      </div>
+
       {/* Admin Panel: Mode Uji Peran & Developer Tools */}
       <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
@@ -235,7 +614,7 @@ export const SettingsModule: React.FC = () => {
               <h3 className="text-sm font-bold text-slate-900">Panel Kontrol Admin & Mode Uji Peran</h3>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Kelola visibilitas bilah pengujian peran dan beralih persona pengguna untuk verifikasi hak akses RBAC.
+              Bilah pengujian peran disembunyikan secara default di tampilan awal mahasiswa. Anda dapat mengaktifkannya di sini untuk pengujian hak akses RBAC.
             </p>
           </div>
 
@@ -254,7 +633,7 @@ export const SettingsModule: React.FC = () => {
 
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-2">
-            Beralih Persona Langsung (Quick Switch):
+            Beralih Persona Langsung (Quick Switch Admin):
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
@@ -290,47 +669,47 @@ export const SettingsModule: React.FC = () => {
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-blue-600" />
           <h3 className="text-sm font-bold text-slate-900">
-            Saran Pengembangan & Rekomendasi Pembaruan Aplikasi
+            Saran Pengembangan & Rekomendasi Pembaruan Aplikasi Berikutnya
           </h3>
         </div>
         <p className="text-xs text-slate-600 leading-relaxed">
-          Berikut adalah rekomendasi peningkatan fungsional dan teknis yang telah dianalisis untuk mendukung skalabilitas operasional kelas perkuliahan:
+          Berikut adalah rekomendasi peningkatan fungsional dan teknis yang telah dianalisis untuk mendukung kelancaran operasional kelas perkuliahan:
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
           <div className="p-3.5 rounded-xl bg-blue-50/60 border border-blue-100 space-y-1">
             <h4 className="font-bold text-blue-900 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-600" /> Integrasi Webhook WhatsApp / Telegram
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600" /> AI Auto-Summary Notulen Rapat & Tugas (Gemini)
             </h4>
             <p className="text-[11px] text-slate-600">
-              Otomatisasi pengiriman notifikasi pengumuman baru, pengingat deadline tugas, dan tagihan kas langsung ke grup WhatsApp kelas.
+              Menghasilkan ringkasan notulen rapat secara otomatis dan mengkonversi hasil diskusi menjadi to-do list tugas kelas siap bagi.
             </p>
           </div>
 
           <div className="p-3.5 rounded-xl bg-purple-50/60 border border-purple-100 space-y-1">
             <h4 className="font-bold text-purple-900 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-600" /> Sinkronisasi Google Calendar
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-600" /> Presensi Kelas QR Code Dinamis & Geofencing
             </h4>
             <p className="text-[11px] text-slate-600">
-              Tombol satu-klik bagi setiap mahasiswa untuk menambahkan seluruh jadwal kuliah dan ujian ke kalender smartphone pribadi (iCal / Google Calendar).
+              Membuat kode QR presensi yang berganti setiap 10 detik dengan validasi radius lokasi GPS ruangan kuliah kampus.
             </p>
           </div>
 
           <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-100 space-y-1">
             <h4 className="font-bold text-emerald-900 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" /> Payment Gateway Otomatis (Midtrans / Xendit)
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" /> Direct Sync Google Drive & Multi-File Upload
             </h4>
             <p className="text-[11px] text-slate-600">
-              Penerbitan Virtual Account (BCA, Mandiri, BRI, BNI) dan QRIS otomatis tanpa perlu bendahara mengecek bukti mutasi secara manual.
+              Integrasi Google Picker API untuk memilih file makalah/tugas langsung dari cloud drive tanpa harus copy-paste tautan manual.
             </p>
           </div>
 
           <div className="p-3.5 rounded-xl bg-amber-50/60 border border-amber-100 space-y-1">
             <h4 className="font-bold text-amber-900 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-600" /> Mode Offline PWA (Progressive Web App)
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-600" /> Notifikasi WhatsApp Otomatis H-1 Deadline
             </h4>
             <p className="text-[11px] text-slate-600">
-              Dukungan Service Worker caching agar mahasiswa tetap dapat membuka jadwal kuliah, dokumen silabus, dan kontak teman sekelas saat koneksi internet kampus lambat.
+              Pengiriman pengingat berkala ke grup WhatsApp kelas pada H-1 jam 19:00 WIB untuk setiap tugas yang belum diserahkan.
             </p>
           </div>
         </div>
@@ -338,3 +717,4 @@ export const SettingsModule: React.FC = () => {
     </div>
   );
 };
+

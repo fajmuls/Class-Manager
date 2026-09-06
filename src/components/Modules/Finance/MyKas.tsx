@@ -11,16 +11,17 @@ import {
   Copy,
   Receipt,
   QrCode,
+  Zap,
+  Building2,
 } from 'lucide-react';
 import { Badge } from '../../UI/Badge.tsx';
-import { Modal } from '../../UI/Modal.tsx';
+import { PaymentGatewayModal } from './PaymentGatewayModal.tsx';
 
 export const MyKasModule: React.FC = () => {
   const { user, classInfo } = useAuth();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [uploadModalPayment, setUploadModalPayment] = useState<Payment | null>(null);
-  const [proofUrl, setProofUrl] = useState('');
+  const [selectedPaymentForGateway, setSelectedPaymentForGateway] = useState<Payment | null>(null);
   const [copyFeedback, setCopyFeedback] = useState(false);
 
   const loadPayments = async () => {
@@ -39,26 +40,6 @@ export const MyKasModule: React.FC = () => {
     loadPayments();
   }, [user?.id]);
 
-  const handleUploadProof = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!uploadModalPayment) return;
-    try {
-      const urlToUse =
-        proofUrl.trim() ||
-        'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=600&q=80';
-      await api.updatePayment(uploadModalPayment.id, {
-        proof_url: urlToUse,
-        status: 'pending',
-      });
-      setUploadModalPayment(null);
-      setProofUrl('');
-      await loadPayments();
-      alert('Bukti transfer berhasil diunggah! Menunggu verifikasi bendahara kelas.');
-    } catch (err: any) {
-      alert(err.message || 'Gagal mengunggah bukti pembayaran');
-    }
-  };
-
   const copyRekening = () => {
     navigator.clipboard.writeText('880192837482');
     setCopyFeedback(true);
@@ -73,7 +54,7 @@ export const MyKasModule: React.FC = () => {
           <CreditCard className="w-5 h-5 text-blue-600" /> Kas Saya & Riwayat Iuran
         </h2>
         <p className="text-xs text-slate-500 mt-1">
-          Pantau status tagihan kas Anda, unggah bukti transfer, dan cek riwayat pembayaran kas terverifikasi.
+          Pantau status tagihan kas Anda, bayar instan via Virtual Account / QRIS otomatis, atau konfirmasi bukti transfer manual.
         </p>
       </div>
 
@@ -81,7 +62,7 @@ export const MyKasModule: React.FC = () => {
       <div className="p-5 bg-gradient-to-r from-blue-700 to-indigo-800 rounded-2xl text-white shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="space-y-1">
           <span className="text-[10px] font-bold uppercase tracking-wider text-blue-200">
-            Rekening Resmi Kas Kelas {classInfo?.code}
+            Rekening & Virtual Account Resmi Kas {classInfo?.code}
           </span>
           <div className="flex items-center gap-3">
             <span className="text-xl sm:text-2xl font-mono font-bold">8801-9283-7482</span>
@@ -101,8 +82,8 @@ export const MyKasModule: React.FC = () => {
         <div className="flex items-center gap-2 bg-white/10 p-3 rounded-xl border border-white/20">
           <QrCode className="w-8 h-8 text-white" />
           <div className="text-left">
-            <p className="text-xs font-bold">QRIS Kas Kelas</p>
-            <p className="text-[10px] text-blue-200">Bebas admin via Gopay/OVO/BCA/Dana</p>
+            <p className="text-xs font-bold">Payment Gateway Aktif</p>
+            <p className="text-[10px] text-blue-200">Support VA BCA, Mandiri, BRI, BNI & QRIS</p>
           </div>
         </div>
       </div>
@@ -147,6 +128,7 @@ export const MyKasModule: React.FC = () => {
                   <p className="text-xs text-slate-500">
                     Nominal: <strong className="text-slate-800">Rp {p.amount.toLocaleString('id-ID')}</strong>
                     {p.paid_at && ` • Dibayar pada: ${new Date(p.paid_at).toLocaleDateString('id-ID')}`}
+                    {p.payment_method && ` • Metode: ${p.payment_method}`}
                   </p>
                 </div>
 
@@ -161,10 +143,11 @@ export const MyKasModule: React.FC = () => {
                     </span>
                   ) : (
                     <button
-                      onClick={() => setUploadModalPayment(p)}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                      onClick={() => setSelectedPaymentForGateway(p)}
+                      className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
                     >
-                      <Upload className="w-3.5 h-3.5" /> Konfirmasi Bayar / Upload Bukti
+                      <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                      <span>Bayar Kas (VA / QRIS / Transfer)</span>
                     </button>
                   )}
                 </div>
@@ -174,55 +157,14 @@ export const MyKasModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Upload Proof Modal */}
-      <Modal
-        isOpen={!!uploadModalPayment}
-        onClose={() => setUploadModalPayment(null)}
-        title="Konfirmasi Pembayaran Kas"
-        subtitle={`Kirimkan bukti transfer untuk ${uploadModalPayment?.bill_title}`}
-      >
-        <form onSubmit={handleUploadProof} className="space-y-4 text-xs">
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-            <p className="text-slate-500">Tagihan:</p>
-            <p className="font-bold text-slate-800 text-sm">{uploadModalPayment?.bill_title}</p>
-            <p className="text-slate-700">
-              Total Pembayaran: <strong className="text-blue-600">Rp {uploadModalPayment?.amount.toLocaleString('id-ID')}</strong>
-            </p>
-          </div>
-
-          <div>
-            <label className="block font-semibold text-slate-700 mb-1">
-              URL Bukti Transfer / Struk Bank
-            </label>
-            <input
-              type="text"
-              placeholder="https://... atau biarkan terisi default demo"
-              value={proofUrl}
-              onChange={(e) => setProofUrl(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500"
-            />
-            <p className="text-[11px] text-slate-400 mt-1">
-              *Tersedia placeholder gambar bukti struk demo otomatis jika dikosongkan.
-            </p>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-3">
-            <button
-              type="button"
-              onClick={() => setUploadModalPayment(null)}
-              className="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 font-semibold"
-            >
-              Batal
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold"
-            >
-              Kirim Bukti Pembayaran
-            </button>
-          </div>
-        </form>
-      </Modal>
+      {/* Payment Gateway Modal */}
+      <PaymentGatewayModal
+        isOpen={!!selectedPaymentForGateway}
+        onClose={() => setSelectedPaymentForGateway(null)}
+        payment={selectedPaymentForGateway}
+        onPaymentSuccess={loadPayments}
+      />
     </div>
   );
 };
+

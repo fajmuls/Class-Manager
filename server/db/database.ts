@@ -20,6 +20,13 @@ import {
   Course,
   CourseAssignment,
   AssignmentSubmission,
+  CourseSyllabus,
+  WebhookConfig,
+  WebhookLog,
+  PaymentGatewayConfig,
+  RoleClaimRequest,
+  KasCollectionColumn,
+  KasChecklistEntry,
 } from '../../src/types/index.ts';
 
 // Standard granular permissions catalog
@@ -92,6 +99,7 @@ export class Database {
   roles: Role[] = [];
   users: User[] = [];
   courses: Course[] = [];
+  syllabuses: CourseSyllabus[] = [];
   assignments: CourseAssignment[] = [];
   submissions: AssignmentSubmission[] = [];
   categories: TransactionCategory[] = [];
@@ -109,6 +117,22 @@ export class Database {
   attendances: AttendanceRecord[] = [];
   notifications: NotificationItem[] = [];
   auditLogs: AuditLog[] = [];
+  webhookConfig!: WebhookConfig;
+  webhookLogs: WebhookLog[] = [];
+  paymentGatewayConfig!: PaymentGatewayConfig;
+  roleClaimRequests: RoleClaimRequest[] = [];
+  kasColumns: KasCollectionColumn[] = [];
+  kasEntries: KasChecklistEntry[] = [];
+  semesters: string[] = [
+    'Semester 1 (Ganjil)',
+    'Semester 2 (Genap)',
+    'Semester 3 (Ganjil)',
+    'Semester 4 (Genap)',
+    'Semester 5 (Ganjil)',
+    'Semester 6 (Genap)',
+    'Semester 7 (Ganjil)',
+    'Semester 8 (Genap)',
+  ];
 
   constructor() {
     this.classInfo = {
@@ -128,8 +152,10 @@ export class Database {
     this.seedRoles();
     this.seedUsers();
     this.seedCourses();
+    this.seedSyllabuses();
     this.seedCategories();
     this.seedFinance();
+    this.seedKasTable();
     this.seedEvents();
     this.seedAnnouncements();
     this.seedMeetings();
@@ -139,6 +165,8 @@ export class Database {
     this.seedAttendance();
     this.seedNotifications();
     this.seedInitialAudit();
+    this.seedWebhook();
+    this.seedPaymentGateway();
   }
 
   // --- SEEDERS ---
@@ -367,16 +395,6 @@ export class Database {
       position: string;
       avatar: string;
     }> = [
-      {
-        id: 'usr_superadmin',
-        name: 'MUHAMMAD RACHMAN FAJRI MULIYANSAH',
-        nim: '261011201412',
-        email: 'mrachmanfm@gmail.com',
-        phone: '081234567412',
-        role_id: 'role_superadmin',
-        position: 'Super Admin & Ketua Kelas',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
-      },
       {
         id: 'usr_member_01',
         name: 'ADELTRUDIS AEK',
@@ -618,6 +636,16 @@ export class Database {
         avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=250&q=80',
       },
       {
+        id: 'usr_member_25',
+        name: 'MUHAMMAD RACHMAN FAJRI MULIYANSAH',
+        nim: '261011201412',
+        email: 'mrachmanfm@gmail.com',
+        phone: '081234567412',
+        role_id: 'role_superadmin',
+        position: 'Super Admin & Ketua Kelas',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
+      },
+      {
         id: 'usr_member_26',
         name: 'MUTIARA KASIH',
         nim: '261011201372',
@@ -804,6 +832,9 @@ export class Database {
         sks: 2,
         lecturer_name: 'Fitria Eka Ningsih',
         lecturer_phone: '085714379298',
+        schedule_day: 'Senin',
+        schedule_time: '08:00 - 09:40 WIB',
+        room: 'Lab Komputer 401',
         description: 'Mata kuliah dasar pengenalan teknologi informasi, literasi komputer, pemanfaatan software perkantoran, dan komputasi akuntansi modern.',
         color: 'blue',
       },
@@ -814,6 +845,9 @@ export class Database {
         sks: 3,
         lecturer_name: 'Setianingsih',
         lecturer_phone: '081299169858',
+        schedule_day: 'Senin',
+        schedule_time: '10:00 - 12:30 WIB',
+        room: 'Ruang 402',
         description: 'Konsep matematis terapan dalam analisis ekonomi, fungsi penerimaan, biaya, elastisitas, diferensial dan matriks.',
         color: 'emerald',
       },
@@ -824,6 +858,9 @@ export class Database {
         sks: 3,
         lecturer_name: 'Wiwik Hesbiyah An',
         lecturer_phone: '081213357425',
+        schedule_day: 'Selasa',
+        schedule_time: '08:00 - 10:30 WIB',
+        room: 'Ruang 305',
         description: 'Prinsip-prinsip dasar ekonomi mikro dan makro, struktur pasar, inflasi, kebijakan fiskal, dan moneter.',
         color: 'purple',
       },
@@ -834,6 +871,9 @@ export class Database {
         sks: 2,
         lecturer_name: 'Maman Darmansyah',
         lecturer_phone: '087731927082',
+        schedule_day: 'Selasa',
+        schedule_time: '10:50 - 12:30 WIB',
+        room: 'Ruang 305',
         description: 'Pendidikan ideologi kebangsaan, nilai-nilai moral Pancasila, etika sosial, dan integritas profesional.',
         color: 'rose',
       },
@@ -844,6 +884,9 @@ export class Database {
         sks: 2,
         lecturer_name: 'Adam Sugiarto',
         lecturer_phone: '085215855131',
+        schedule_day: 'Rabu',
+        schedule_time: '08:00 - 09:40 WIB',
+        room: 'Ruang 201',
         description: 'Pemahaman nilai-nilai ketauhidan, akhlak mulia, fiqih muamalah, serta etika bisnis Islami.',
         color: 'amber',
       },
@@ -854,6 +897,9 @@ export class Database {
         sks: 2,
         lecturer_name: 'Jutania',
         lecturer_phone: '087873950662',
+        schedule_day: 'Rabu',
+        schedule_time: '10:00 - 11:40 WIB',
+        room: 'Ruang 204',
         description: 'Penguasaan komunikasi bahasa Inggris praktis, korespondensi formal, presentasi bisnis, dan istilah akuntansi internasional.',
         color: 'indigo',
       },
@@ -864,6 +910,9 @@ export class Database {
         sks: 3,
         lecturer_name: 'Wiwit Irawati',
         lecturer_phone: '08128002843',
+        schedule_day: 'Kamis',
+        schedule_time: '08:00 - 10:30 WIB',
+        room: 'Ruang 410',
         description: 'Siklus lengkap akuntansi jasa dan dagang: penjurnalan, buku besar, neraca saldo, ayat jurnal penyesuaian, laporan keuangan, dan jurnal penutup.',
         color: 'teal',
       },
@@ -874,6 +923,9 @@ export class Database {
         sks: 3,
         lecturer_name: 'Muhammad Rizal Seragih',
         lecturer_phone: '085212433585',
+        schedule_day: 'Kamis',
+        schedule_time: '10:50 - 13:20 WIB',
+        room: 'Ruang 410',
         description: 'Fungsi-fungsi manajemen operasional (POAC), kepemimpinan organisasi, dinamika lingkungan bisnis, dan etika korporasi.',
         color: 'cyan',
       },
@@ -882,10 +934,265 @@ export class Database {
     this.submissions = [];
   }
 
+  private seedSyllabuses() {
+    this.syllabuses = [
+      {
+        id: 'syl_01',
+        course_id: 'crs_01',
+        course_name: 'Teknologi Informasi Dasar',
+        academic_year: '2026/2027',
+        semester: 'Semester 1',
+        rps_document_url: 'https://drive.google.com/drive/folders/01SAKP014_RPS_TID',
+        drive_folder_url: 'https://drive.google.com/drive/folders/01SAKP014_TID_Materi',
+        assessment_criteria: { attendance: 10, tasks: 20, uts: 30, uas: 40 },
+        meetings: [
+          { meeting_no: 1, topic: 'Pengantar Sistem Komputer & Hardware/Software', subtopics: ['Arsitektur Komputer', 'Perangkat Input & Output', 'Sistem Operasi'], learning_outcome: 'Mahasiswa memahami komponen inti perangkat keras dan lunak komputer modern.' },
+          { meeting_no: 2, topic: 'Aplikasi Spreadsheet Excel untuk Akuntansi', subtopics: ['Formula Matematika & Statistik', 'Lookup Functions (VLOOKUP/XLOOKUP)', 'Pivot Table'], learning_outcome: 'Mampu mengolah data tabel keuangan dan menyusun formula spreadsheet.' },
+          { meeting_no: 3, topic: 'Database Manajemen & SQL Sederhana', subtopics: ['Konsep Entitas & Relasi', 'Query SELECT Dasar', 'Data Integrity'], learning_outcome: 'Memahami dasar penyimpanan data terstruktur.' },
+          { meeting_no: 4, topic: 'Cloud Computing & Sistem Informasi Akuntansi Modern', subtopics: ['SaaS, PaaS, IaaS', 'Keamanan Data & Privasi', 'ERP Terintegrasi'], learning_outcome: 'Memahami integrasi cloud pada sistem pelaporan keuangan.' },
+        ],
+      },
+      {
+        id: 'syl_02',
+        course_id: 'crs_02',
+        course_name: 'Matematika Ekonomi dan Bisnis',
+        academic_year: '2026/2027',
+        semester: 'Semester 1',
+        rps_document_url: 'https://drive.google.com/drive/folders/01SAKP014_RPS_MEB',
+        drive_folder_url: 'https://drive.google.com/drive/folders/01SAKP014_MEB_Materi',
+        assessment_criteria: { attendance: 10, tasks: 25, uts: 30, uas: 35 },
+        meetings: [
+          { meeting_no: 1, topic: 'Fungsi Linier & Keseimbangan Pasar', subtopics: ['Fungsi Permintaan & Penawaran', 'Titik Keseimbangan (Equilibrium)', 'Pengaruh Pajak & Subsidi'], learning_outcome: 'Mampu menentukan titik keseimbangan pasar kuantitatif.' },
+          { meeting_no: 2, topic: 'Fungsi Non-Linier dalam Bisnis', subtopics: ['Fungsi Kuadrat', 'Kurva Penerimaan Total (TR)', 'Kurva Biaya Total (TC)'], learning_outcome: 'Mampu menganalisis titik impas (Break Even Point).' },
+          { meeting_no: 3, topic: 'Diferensial / Turunan Parsial', subtopics: ['Konsep Elastisitas Harga', 'Optimalisasi Laba Maksimum', 'Biaya Marjinal (MC)'], learning_outcome: 'Mampu menghitung tingkat laba maksimum menggunakan turunan.' },
+          { meeting_no: 4, topic: 'Matriks & Aljabar Linier Terapan', subtopics: ['Operasi Matriks', 'Determinan & Invers', 'Penyelesaian SPL Bisnis'], learning_outcome: 'Mampu menyelesaikan sistem persamaan ekonomi multivariat.' },
+        ],
+      },
+      {
+        id: 'syl_03',
+        course_id: 'crs_03',
+        course_name: 'Economics',
+        academic_year: '2026/2027',
+        semester: 'Semester 1',
+        rps_document_url: 'https://drive.google.com/drive/folders/01SAKP014_RPS_ECO',
+        drive_folder_url: 'https://drive.google.com/drive/folders/01SAKP014_ECO_Materi',
+        assessment_criteria: { attendance: 10, tasks: 20, uts: 35, uas: 35 },
+        meetings: [
+          { meeting_no: 1, topic: 'Dasar Ilmu Ekonomi & Kelangkaan (Scarcity)', subtopics: ['Opportunity Cost', 'Prinsip Ekonomi', 'Batas Kemungkinan Produksi (PPF)'], learning_outcome: 'Memahami prinsip alokasi sumber daya terbatas.' },
+          { meeting_no: 2, topic: 'Teori Permintaan, Penawaran & Elastisitas', subtopics: ['Hukum Permintaan & Penawaran', 'Faktor Penggeser Kurva', 'Elastisitas Permintaan'], learning_outcome: 'Mampu memproyeksikan pergeseran harga dan kuantitas pasar.' },
+          { meeting_no: 3, topic: 'Struktur Pasar & Penetapan Harga', subtopics: ['Pasar Persaingan Sempurna', 'Monopoli & Oligopoli', 'Monopolistik'], learning_outcome: 'Memahami perilaku produsen dalam berbagai struktur industri.' },
+          { meeting_no: 4, topic: 'Makroekonomi: Pendapatan Nasional & Inflasi', subtopics: ['PDB (GDP/GNP)', 'Indeks Harga Konsumen (IHK)', 'Kebijakan Moneter BI'], learning_outcome: 'Memahami indikator makroekonomi agregat nasional.' },
+        ],
+      },
+      {
+        id: 'syl_04',
+        course_id: 'crs_04',
+        course_name: 'Pancasila',
+        academic_year: '2026/2027',
+        semester: 'Semester 1',
+        rps_document_url: 'https://drive.google.com/drive/folders/01SAKP014_RPS_PAN',
+        drive_folder_url: 'https://drive.google.com/drive/folders/01SAKP014_PAN_Materi',
+        assessment_criteria: { attendance: 15, tasks: 25, uts: 30, uas: 30 },
+        meetings: [
+          { meeting_no: 1, topic: 'Pancasila dalam Arus Sejarah Bangsa', subtopics: ['Perumusan Piagam Jakarta', 'Sidang BPUPKI & PPKI', 'Dinamika Era Kemerdekaan'], learning_outcome: 'Memahami latar historis lahirnya falsafah bangsa.' },
+          { meeting_no: 2, topic: 'Pancasila Sebagai Sistem Etika Profesi', subtopics: ['Integritas Moral', 'Keadilan Sosial Akuntan', 'Pencegahan Korupsi'], learning_outcome: 'Menerapkan integritas etis dalam dunia profesi dan akademik.' },
+        ],
+      },
+      {
+        id: 'syl_05',
+        course_id: 'crs_05',
+        course_name: 'Agama Islam',
+        academic_year: '2026/2027',
+        semester: 'Semester 1',
+        rps_document_url: 'https://drive.google.com/drive/folders/01SAKP014_RPS_AGI',
+        drive_folder_url: 'https://drive.google.com/drive/folders/01SAKP014_AGI_Materi',
+        assessment_criteria: { attendance: 15, tasks: 25, uts: 30, uas: 30 },
+        meetings: [
+          { meeting_no: 1, topic: 'Tauhid & Akhlak Mulia dalam Kehidupan Mahasiswa', subtopics: ['Konsep Aqidah', 'Akhlak Terhadap Sesama', 'Kejujuran Intelektual'], learning_outcome: 'Membangun karakter berakhlak mulia dan berintegritas.' },
+          { meeting_no: 2, topic: 'Prinsip Fiqih Muamalah & Etika Bisnis Syariah', subtopics: ['Akad Keuangan (Mudharabah/Musyarakah)', 'Larangan Riba & Gharar', 'Zakat Bisnis'], learning_outcome: 'Memahami prinsip transaksi syariah yang adil dan transparan.' },
+        ],
+      },
+      {
+        id: 'syl_06',
+        course_id: 'crs_06',
+        course_name: 'Basic English for International Communication',
+        academic_year: '2026/2027',
+        semester: 'Semester 1',
+        rps_document_url: 'https://drive.google.com/drive/folders/01SAKP014_RPS_ENG',
+        drive_folder_url: 'https://drive.google.com/drive/folders/01SAKP014_ENG_Materi',
+        assessment_criteria: { attendance: 10, tasks: 30, uts: 30, uas: 30 },
+        meetings: [
+          { meeting_no: 1, topic: 'Professional Self-Introduction & Networking', subtopics: ['Academic Introductions', 'Email Etiquette', 'Elevator Pitch'], learning_outcome: 'Able to introduce professional profile fluently in English.' },
+          { meeting_no: 2, topic: 'Financial & Accounting Terminology', subtopics: ['Balance Sheet Vocabulary', 'Income Statement Terms', 'Asset & Liability Expressions'], learning_outcome: 'Mastering international financial terminology.' },
+          { meeting_no: 3, topic: 'Delivering Business Presentations', subtopics: ['Signposting Phrases', 'Explaining Graphs & Trends', 'Handling Q&A Sessions'], learning_outcome: 'Able to deliver a structured financial report presentation.' },
+        ],
+      },
+      {
+        id: 'syl_07',
+        course_id: 'crs_07',
+        course_name: 'Akuntansi Perusahaan Jasa dan Dagang',
+        academic_year: '2026/2027',
+        semester: 'Semester 1',
+        rps_document_url: 'https://drive.google.com/drive/folders/01SAKP014_RPS_APJ',
+        drive_folder_url: 'https://drive.google.com/drive/folders/01SAKP014_APJ_Materi',
+        assessment_criteria: { attendance: 10, tasks: 25, uts: 30, uas: 35 },
+        meetings: [
+          { meeting_no: 1, topic: 'Persamaan Dasar Akuntansi & Bukti Transaksi', subtopics: ['Harta = Utang + Modal', 'Analisis Bukti Kas Masuk/Keluar', 'Faktur & Kuitansi'], learning_outcome: 'Mampu menganalisis pengaruh transaksi terhadap posisi keuangan.' },
+          { meeting_no: 2, topic: 'Jurnal Umum & Posting Buku Besar', subtopics: ['Aturan Debit/Kredit', 'Pembuatan Jurnal Umum', 'Buku Besar T & Skontro'], learning_outcome: 'Terampil melakukan pencatatan jurnal berpasangan.' },
+          { meeting_no: 3, topic: 'Neraca Saldo & Ayat Jurnal Penyesuaian (AJP)', subtopics: ['Beban Dibayar Dimuka', 'Pendapatan Diterima Dimuka', 'Penyusutan Aset Tetap'], learning_outcome: 'Mampu menyusun penyesuaian akhir periode.' },
+          { meeting_no: 4, topic: 'Kertas Kerja (Neraca Lajur 10 Kolom) & Laporan Keuangan', subtopics: ['Laba Rugi', 'Perubahan Ekuitas', 'Neraca / Posisi Keuangan', 'Jurnal Penutup'], learning_outcome: 'Mampu menyusun laporan keuangan lengkap dan jurnal penutup.' },
+        ],
+      },
+      {
+        id: 'syl_08',
+        course_id: 'crs_08',
+        course_name: 'Principle of Management and Business',
+        academic_year: '2026/2027',
+        semester: 'Semester 1',
+        rps_document_url: 'https://drive.google.com/drive/folders/01SAKP014_RPS_PMB',
+        drive_folder_url: 'https://drive.google.com/drive/folders/01SAKP014_PMB_Materi',
+        assessment_criteria: { attendance: 10, tasks: 20, uts: 35, uas: 35 },
+        meetings: [
+          { meeting_no: 1, topic: 'Konsep Dasar Manajemen & Lingkungan Bisnis', subtopics: ['Evolusi Teori Manajemen', 'Lingkungan Internal & Eksternal', 'Etika Bisnis'], learning_outcome: 'Memahami peran manajer dan ekosistem industri.' },
+          { meeting_no: 2, topic: 'Perencanaan (Planning) & Pengambilan Keputusan', subtopics: ['Visi & Misi Organisasi', 'Analisis SWOT', 'Manajemen Strategis'], learning_outcome: 'Mampu merumuskan sasaran dan strategi operasional.' },
+          { meeting_no: 3, topic: 'Pengorganisasian (Organizing) & Struktur Perusahaan', subtopics: ['Hierarki Organisasi', 'Pendelegasian Wewenang', 'Desain Kerja'], learning_outcome: 'Mampu merancang struktur tim yang efektif.' },
+          { meeting_no: 4, topic: 'Pengarahan (Actuating) & Pengendalian (Controlling)', subtopics: ['Gaya Kepemimpinan', 'Motivasi Karyawan', 'Key Performance Indicators (KPI)'], learning_outcome: 'Memahami teknik supervisi dan evaluasi performa kerja.' },
+        ],
+      },
+    ];
+  }
+
+  private seedWebhook() {
+    this.webhookConfig = {
+      id: 'cfg_webhook_default',
+      whatsapp_webhook_url: 'https://api.fonnte.com/send',
+      telegram_bot_token: '',
+      telegram_chat_id: '',
+      is_enabled: true,
+      events: {
+        announcements: true,
+        assignment_deadline_h1: true,
+        kas_bill: true,
+        meetings: true,
+      },
+      last_triggered_at: new Date().toISOString(),
+    };
+    this.webhookLogs = [
+      {
+        id: 'log_01',
+        event: 'Sistem Dimulai',
+        target: 'both',
+        payload_summary: 'Inisialisasi webhook bot pengingat kelas 01SAKP014 aktif.',
+        status: 'simulated',
+        timestamp: new Date().toISOString(),
+      },
+    ];
+  }
+
+  private seedPaymentGateway() {
+    this.paymentGatewayConfig = {
+      provider: 'simulated',
+      is_active: true,
+      merchant_id: 'MID-01SAKP014-FEB',
+      client_key: 'SB-Mid-client-01SAKP014-LIVE',
+      server_key: 'SB-Mid-server-01SAKP014-SECRET',
+      enable_va_bca: true,
+      enable_va_mandiri: true,
+      enable_va_bri: true,
+      enable_va_bni: true,
+      enable_qris: true,
+    };
+  }
+
+  // Dispatch Webhook to WhatsApp / Telegram
+  async dispatchWebhook(event: string, title: string, message: string, details?: any) {
+    const log: WebhookLog = {
+      id: `wlog_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      event,
+      target: 'both',
+      payload_summary: `[${event}] ${title}: ${message.slice(0, 100)}...`,
+      status: 'simulated',
+      timestamp: new Date().toISOString(),
+    };
+
+    // If Telegram is configured, try real HTTP dispatch
+    if (this.webhookConfig.telegram_bot_token && this.webhookConfig.telegram_chat_id) {
+      try {
+        const text = `📢 *[01SAKP014 • ${event}]*\n*${title}*\n\n${message}\n\n_Sistem Administrasi Kelas 01SAKP014_`;
+        await fetch(`https://api.telegram.org/bot${this.webhookConfig.telegram_bot_token}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: this.webhookConfig.telegram_chat_id,
+            text,
+            parse_mode: 'Markdown',
+          }),
+        });
+        log.status = 'success';
+      } catch (err) {
+        log.status = 'failed';
+      }
+    }
+
+    this.webhookLogs.unshift(log);
+    if (this.webhookLogs.length > 50) this.webhookLogs.pop();
+    this.webhookConfig.last_triggered_at = new Date().toISOString();
+    return log;
+  }
+
+
   private seedFinance() {
     this.transactions = [];
     this.bills = [];
     this.payments = [];
+  }
+
+  private seedKasTable() {
+    this.kasColumns = [
+      {
+        id: 'col_kas_minggu_1',
+        title: 'Kas Minggu 1 Sep 2026',
+        date: '2026-09-01',
+        amount: 5000,
+        period_type: 'weekly',
+        created_by: 'usr_member_25',
+        created_at: '2026-09-01T08:00:00Z',
+      },
+      {
+        id: 'col_kas_minggu_2',
+        title: 'Kas Minggu 2 Sep 2026',
+        date: '2026-09-08',
+        amount: 5000,
+        period_type: 'weekly',
+        created_by: 'usr_member_25',
+        created_at: '2026-09-06T08:00:00Z',
+      },
+      {
+        id: 'col_kas_harian_01',
+        title: 'Kas Harian 6 Sep 2026',
+        date: '2026-09-06',
+        amount: 2000,
+        period_type: 'daily',
+        created_by: 'usr_member_25',
+        created_at: '2026-09-06T08:00:00Z',
+      },
+    ];
+
+    this.kasEntries = [];
+    for (const col of this.kasColumns) {
+      for (const user of this.users) {
+        this.kasEntries.push({
+          id: `ke_${col.id}_${user.id}`,
+          column_id: col.id,
+          user_id: user.id,
+          user_name: user.name,
+          user_nim: user.nim,
+          is_paid: false,
+          paid_amount: col.amount,
+          updated_by: 'System',
+        });
+      }
+    }
   }
 
   private seedEvents() {

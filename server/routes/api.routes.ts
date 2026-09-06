@@ -1,7 +1,20 @@
 import { Router, Response } from 'express';
 import { db, SYSTEM_PERMISSIONS } from '../db/database.ts';
 import { AuthenticatedRequest, requirePermission } from '../middleware/auth.ts';
-import { Transaction, Bill, EventItem, Announcement, TaskItem, DocumentItem, Poll, AttendanceRecord, Meeting } from '../../src/types/index.ts';
+import {
+  Transaction,
+  Bill,
+  EventItem,
+  Announcement,
+  TaskItem,
+  DocumentItem,
+  Poll,
+  AttendanceRecord,
+  Meeting,
+  RoleClaimRequest,
+  KasCollectionColumn,
+  KasChecklistEntry,
+} from '../../src/types/index.ts';
 
 export const apiRouter = Router();
 
@@ -37,65 +50,222 @@ apiRouter.get('/auth/me', (req: AuthenticatedRequest, res: Response) => {
 });
 
 apiRouter.post('/auth/google-login', (req, res: Response) => {
-  const { email, displayName, photoURL, uid } = req.body;
+  const { email, displayName, photoURL } = req.body;
   if (!email) {
     return res.status(400).json({ error: 'Email Google diperlukan' });
   }
 
   const isSuperAdmin = email.toLowerCase() === 'mrachmanfm@gmail.com';
-  let user = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
 
-  if (user) {
-    if (isSuperAdmin) {
-      user.role_id = 'role_superadmin';
-      user.role_name = 'Super Admin';
+  if (isSuperAdmin) {
+    let superAdmin = db.users.find(u => u.email.toLowerCase() === 'mrachmanfm@gmail.com' || u.id === 'usr_member_25');
+    if (!superAdmin) {
+      superAdmin = db.users[24] || db.users[0];
     }
-    if (photoURL) user.avatar = photoURL;
-    if (displayName && !user.name) user.name = displayName;
-    user.updated_at = new Date().toISOString();
-  } else {
-    // New user logging in with Google
-    const newId = `usr_google_${Date.now()}`;
-    const newRole = isSuperAdmin ? 'role_superadmin' : 'role_anggota';
-    user = {
-      id: newId,
-      name: displayName || email.split('@')[0].toUpperCase(),
-      nim: isSuperAdmin ? '261011201412' : `26101120${Math.floor(1000 + Math.random() * 9000)}`,
-      email: email,
-      phone: '',
-      avatar: photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
-      class_id: db.classInfo.id,
-      department: db.classInfo.major,
-      cohort: '2026',
-      role_id: newRole,
-      role_name: isSuperAdmin ? 'Super Admin' : 'Anggota',
-      position: isSuperAdmin ? 'Super Admin & Ketua Kelas' : 'Anggota',
-      is_active: true,
-      joined_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    db.users.push(user);
-    
-    db.logAudit({
-      userId: user.id,
-      action: 'GOOGLE_SIGN_IN_NEW_USER',
-      entityType: 'User',
-      entityId: user.id,
-      oldValue: null,
-      newValue: { email, name: user.name, role_id: newRole },
+    superAdmin.email = 'mrachmanfm@gmail.com';
+    superAdmin.role_id = 'role_superadmin';
+    superAdmin.role_name = 'Super Admin';
+    if (photoURL) superAdmin.avatar = photoURL;
+    if (displayName) superAdmin.name = displayName;
+    superAdmin.updated_at = new Date().toISOString();
+
+    currentGlobalUserId = superAdmin.id;
+    const role = db.roles.find(r => r.id === 'role_superadmin');
+    return res.json({
+      success: true,
+      isSuperAdmin: true,
+      isApproved: true,
+      user: superAdmin,
+      role,
+      permissions: role?.permissions || [],
+      classInfo: db.classInfo,
     });
   }
 
-  currentGlobalUserId = user.id;
-  const role = db.roles.find(r => r.id === user.role_id);
-  res.json({
+  // Check if email belongs to an existing member (already approved/assigned)
+  const existingUser = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  if (existingUser) {
+    if (photoURL) existingUser.avatar = photoURL;
+    existingUser.updated_at = new Date().toISOString();
+    currentGlobalUserId = existingUser.id;
+    const role = db.roles.find(r => r.id === existingUser.role_id);
+    return res.json({
+      success: true,
+      isSuperAdmin: false,
+      isApproved: true,
+      user: existingUser,
+      role,
+      permissions: role?.permissions || [],
+      classInfo: db.classInfo,
+    });
+  }
+
+  // Not mapped to an approved user yet. Check pending claim request
+  const existingClaim = db.roleClaimRequests.find(c => c.google_email.toLowerCase() === email.toLowerCase());
+  if (existingClaim) {
+    if (existingClaim.status === 'pending') {
+      return res.json({
+        success: true,
+        isSuperAdmin: false,
+        isApproved: false,
+        isPendingApproval: true,
+        claimRequest: existingClaim,
+        classInfo: db.classInfo,
+      });
+    } else if (existingClaim.status === 'rejected') {
+      return res.json({
+        success: true,
+        isSuperAdmin: false,
+        isApproved: false,
+        isRejected: true,
+        claimRequest: existingClaim,
+        classInfo: db.classInfo,
+      });
+    }
+  }
+
+  // User needs to claim who they are
+  return res.json({
     success: true,
-    user,
-    role,
-    permissions: role?.permissions || [],
+    isSuperAdmin: false,
+    isApproved: false,
+    requiresClaim: true,
     classInfo: db.classInfo,
   });
+});
+
+apiRouter.post('/auth/claim-role', async (req, res: Response) => {
+  const { email, displayName, photoURL, target_user_id, requested_role_id, message } = req.body;
+  if (!email || !target_user_id) {
+    return res.status(400).json({ error: 'Email dan pilihan identitas mahasiswa diperlukan' });
+  }
+
+  const targetUser = db.users.find(u => u.id === target_user_id);
+  const targetRole = db.roles.find(r => r.id === requested_role_id) || db.roles.find(r => r.id === 'role_anggota');
+
+  if (!targetUser) {
+    return res.status(404).json({ error: 'Data mahasiswa tidak ditemukan' });
+  }
+
+  const existingClaim = db.roleClaimRequests.find(c => c.google_email.toLowerCase() === email.toLowerCase());
+  if (existingClaim && existingClaim.status === 'pending') {
+    existingClaim.target_user_id = targetUser.id;
+    existingClaim.target_user_name = targetUser.name;
+    existingClaim.target_user_nim = targetUser.nim;
+    existingClaim.requested_role_id = targetRole?.id || 'role_anggota';
+    existingClaim.requested_role_name = targetRole?.name || 'Anggota';
+    existingClaim.message = message || '';
+    existingClaim.updated_at = new Date().toISOString();
+
+    return res.json({ success: true, claimRequest: existingClaim });
+  }
+
+  const newClaim: RoleClaimRequest = {
+    id: `claim_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    google_email: email,
+    google_name: displayName || email.split('@')[0],
+    google_photo: photoURL,
+    target_user_id: targetUser.id,
+    target_user_name: targetUser.name,
+    target_user_nim: targetUser.nim,
+    requested_role_id: targetRole?.id || 'role_anggota',
+    requested_role_name: targetRole?.name || 'Anggota',
+    status: 'pending',
+    message: message || '',
+    created_at: new Date().toISOString(),
+  };
+
+  db.roleClaimRequests.unshift(newClaim);
+
+  // Notify Super Admin
+  const superAdmin = db.users.find(u => u.role_id === 'role_superadmin') || db.users[24] || db.users[0];
+  if (superAdmin) {
+    db.pushNotification({
+      userId: superAdmin.id,
+      title: 'Permintaan Persetujuan Akun Google Baru',
+      message: `${newClaim.google_name} (${newClaim.google_email}) meminta konfirmasi sebagai ${newClaim.target_user_name} (${newClaim.target_user_nim}) dengan role ${newClaim.requested_role_name}.`,
+      type: 'role_request',
+      link: '/settings',
+    });
+  }
+
+  try {
+    await db.dispatchWebhook(
+      'ROLE_CLAIM_SUBMITTED',
+      'Permintaan Verifikasi Akun Baru',
+      `Mahasiswa ${newClaim.target_user_name} (${newClaim.target_user_nim}) login via Google (${newClaim.google_email}) dan meminta verifikasi role: ${newClaim.requested_role_name}. Silakan buka Dashboard Super Admin untuk menyetujui.`
+    );
+  } catch (err) {
+    // ignore
+  }
+
+  res.json({ success: true, claimRequest: newClaim });
+});
+
+apiRouter.get('/auth/claim-requests', (_req, res: Response) => {
+  res.json(db.roleClaimRequests);
+});
+
+apiRouter.post('/auth/claim-requests/:id/approve', (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { assigned_role_id } = req.body;
+
+  const claim = db.roleClaimRequests.find(c => c.id === id);
+  if (!claim) {
+    return res.status(404).json({ error: 'Permintaan tidak ditemukan' });
+  }
+
+  claim.status = 'approved';
+  claim.reviewed_at = new Date().toISOString();
+  claim.reviewed_by = req.user ? req.user.name : 'Super Admin';
+
+  const targetUser = db.users.find(u => u.id === claim.target_user_id);
+  if (targetUser) {
+    targetUser.email = claim.google_email;
+    if (claim.google_photo) targetUser.avatar = claim.google_photo;
+    const finalRole = db.roles.find(r => r.id === (assigned_role_id || claim.requested_role_id));
+    if (finalRole) {
+      targetUser.role_id = finalRole.id;
+      targetUser.role_name = finalRole.name;
+    }
+    targetUser.updated_at = new Date().toISOString();
+
+    db.logAudit({
+      userId: req.user?.id || 'usr_member_25',
+      action: 'APPROVE_ROLE_CLAIM',
+      entityType: 'User',
+      entityId: targetUser.id,
+      oldValue: null,
+      newValue: { email: targetUser.email, role_id: targetUser.role_id, role_name: targetUser.role_name },
+    });
+
+    db.pushNotification({
+      userId: targetUser.id,
+      title: 'Akun Google Anda Telah Disetujui!',
+      message: `Permintaan login Anda sebagai ${targetUser.name} dengan role ${targetUser.role_name} telah disetujui oleh Super Admin.`,
+      type: 'role_request',
+      link: '/dashboard',
+    });
+  }
+
+  res.json({ success: true, claim, user: targetUser });
+});
+
+apiRouter.post('/auth/claim-requests/:id/reject', (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+
+  const claim = db.roleClaimRequests.find(c => c.id === id);
+  if (!claim) {
+    return res.status(404).json({ error: 'Permintaan tidak ditemukan' });
+  }
+
+  claim.status = 'rejected';
+  claim.reviewed_at = new Date().toISOString();
+  claim.reviewed_by = req.user ? req.user.name : 'Super Admin';
+  if (reason) claim.message = `${claim.message || ''} (Alasan penolakan: ${reason})`;
+
+  res.json({ success: true, claim });
 });
 
 apiRouter.post('/auth/assign-role', requirePermission('manage_roles'), (req: AuthenticatedRequest, res: Response) => {
@@ -677,6 +847,168 @@ apiRouter.put('/finance/payments/:id', (req: AuthenticatedRequest, res: Response
   });
 
   res.json(payment);
+});
+
+// --- KAS CHECKLIST TABLE ---
+apiRouter.get('/finance/kas-table', (_req: AuthenticatedRequest, res: Response) => {
+  // Ensure every active user has an entry for each column
+  for (const col of db.kasColumns) {
+    for (const user of db.users) {
+      const exists = db.kasEntries.some(e => e.column_id === col.id && e.user_id === user.id);
+      if (!exists) {
+        db.kasEntries.push({
+          id: `ke_${col.id}_${user.id}`,
+          column_id: col.id,
+          user_id: user.id,
+          user_name: user.name,
+          user_nim: user.nim,
+          is_paid: false,
+          paid_amount: col.amount,
+          updated_by: 'System',
+        });
+      }
+    }
+  }
+
+  res.json({
+    columns: db.kasColumns.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    entries: db.kasEntries,
+    students: db.users.filter(u => u.is_active),
+  });
+});
+
+apiRouter.post('/finance/kas-columns', (req: AuthenticatedRequest, res: Response) => {
+  const { title, date, amount, period_type } = req.body;
+  if (!title || !amount) {
+    return res.status(400).json({ error: 'Judul dan nominal kas wajib diisi' });
+  }
+
+  const newCol: KasCollectionColumn = {
+    id: `col_${Date.now()}`,
+    title,
+    date: date || new Date().toISOString().split('T')[0],
+    amount: Number(amount),
+    period_type: period_type || 'weekly',
+    created_by: req.user?.id || 'usr_member_25',
+    created_at: new Date().toISOString(),
+  };
+
+  db.kasColumns.push(newCol);
+
+  // Initialize entries for all active students
+  db.users.forEach(user => {
+    db.kasEntries.push({
+      id: `ke_${newCol.id}_${user.id}`,
+      column_id: newCol.id,
+      user_id: user.id,
+      user_name: user.name,
+      user_nim: user.nim,
+      is_paid: false,
+      paid_amount: newCol.amount,
+      updated_by: req.user?.name || 'Admin',
+    });
+  });
+
+  res.status(201).json(newCol);
+});
+
+apiRouter.post('/finance/kas-checklist/toggle', (req: AuthenticatedRequest, res: Response) => {
+  const { column_id, user_id, is_paid, payment_method, notes } = req.body;
+  let entry = db.kasEntries.find(e => e.column_id === column_id && e.user_id === user_id);
+  const col = db.kasColumns.find(c => c.id === column_id);
+  const student = db.users.find(u => u.id === user_id);
+
+  if (!entry) {
+    if (!col || !student) {
+      return res.status(404).json({ error: 'Data kolom atau mahasiswa tidak ditemukan' });
+    }
+    entry = {
+      id: `ke_${column_id}_${user_id}`,
+      column_id,
+      user_id,
+      user_name: student.name,
+      user_nim: student.nim,
+      is_paid: false,
+      paid_amount: col.amount,
+    };
+    db.kasEntries.push(entry);
+  }
+
+  const wasPaid = entry.is_paid;
+  entry.is_paid = Boolean(is_paid);
+  entry.payment_method = payment_method || (entry.is_paid ? 'cash' : undefined);
+  entry.notes = notes || entry.notes;
+  entry.paid_at = entry.is_paid ? (entry.paid_at || new Date().toISOString()) : undefined;
+  entry.updated_by = req.user?.name || 'Bendahara';
+
+  // If status changed to paid, create a Transaction in db.transactions to sync with balance & transparency
+  if (!wasPaid && entry.is_paid) {
+    const txId = `tx_kas_${entry.column_id}_${entry.user_id}`;
+    const existingTx = db.transactions.find(t => t.id === txId);
+    if (!existingTx) {
+      db.transactions.push({
+        id: txId,
+        class_id: db.classInfo.id,
+        code: `KAS-${Date.now().toString().slice(-4)}`,
+        type: 'income',
+        amount: col ? col.amount : 5000,
+        category_id: 'cat_kas_rutin',
+        category_name: 'Kas Rutin Bulanan',
+        description: `Iuran Kas [${col?.title || 'Rutin'}]: ${student?.name || entry.user_name}`,
+        receipt_url: '',
+        created_by: req.user?.id || 'usr_member_25',
+        creator_name: req.user?.name || 'Bendahara',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        deleted_at: null,
+      });
+    }
+  } else if (wasPaid && !entry.is_paid) {
+    // If unchecked, mark corresponding transaction as deleted
+    const txId = `tx_kas_${entry.column_id}_${entry.user_id}`;
+    const tx = db.transactions.find(t => t.id === txId);
+    if (tx) {
+      tx.deleted_at = new Date().toISOString();
+    }
+  }
+
+  res.json({ success: true, entry });
+});
+
+apiRouter.delete('/finance/kas-columns/:id', (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  db.kasColumns = db.kasColumns.filter(c => c.id !== id);
+  db.kasEntries = db.kasEntries.filter(e => e.column_id !== id);
+  res.json({ success: true });
+});
+
+// --- DYNAMIC SEMESTER & COURSES SETTINGS ---
+apiRouter.get('/settings/semesters', (_req: AuthenticatedRequest, res: Response) => {
+  res.json({
+    semesters: db.semesters,
+    current_semester: db.classInfo.semester,
+    academic_year: db.classInfo.academic_year,
+  });
+});
+
+apiRouter.post('/settings/semesters', (req: AuthenticatedRequest, res: Response) => {
+  const { name } = req.body;
+  if (name && !db.semesters.includes(name)) {
+    db.semesters.push(name);
+  }
+  res.json({ semesters: db.semesters });
+});
+
+apiRouter.put('/settings/active-semester', (req: AuthenticatedRequest, res: Response) => {
+  const { semester, academic_year } = req.body;
+  if (semester) db.classInfo.semester = semester;
+  if (academic_year) db.classInfo.academic_year = academic_year;
+  db.classInfo.updated_at = new Date().toISOString();
+
+  res.json({
+    success: true,
+    classInfo: db.classInfo,
+  });
 });
 
 // --- AGENDA & CALENDAR ---
@@ -1293,3 +1625,320 @@ apiRouter.post('/assignments/:id/submit', (req: AuthenticatedRequest, res: Respo
 
   res.status(201).json({ success: true, submission: submissionData });
 });
+
+// --- SYLLABUS & RPS MODULE ---
+apiRouter.get('/courses/:id/syllabus', (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const course = db.courses.find(c => c.id === id);
+  if (!course) return res.status(404).json({ error: 'Mata kuliah tidak ditemukan' });
+
+  let syllabus = db.syllabuses.find(s => s.course_id === id);
+  if (!syllabus) {
+    syllabus = {
+      id: `syl_${id}`,
+      course_id: id,
+      course_name: course.name,
+      academic_year: '2026/2027',
+      semester: 'Semester 1',
+      rps_document_url: '',
+      drive_folder_url: '',
+      assessment_criteria: { attendance: 10, tasks: 20, uts: 35, uas: 35 },
+      meetings: [
+        { meeting_no: 1, topic: 'Kontrak Perkuliahan & Pengantar Mata Kuliah', subtopics: ['Aturan Kelas', 'Silabus Semester', 'Sistem Penilaian'], learning_outcome: 'Memahami sasaran capaian pembelajaran mata kuliah.' }
+      ],
+    };
+    db.syllabuses.push(syllabus);
+  }
+
+  res.json(syllabus);
+});
+
+apiRouter.put('/courses/:id/syllabus', (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { rps_document_url, drive_folder_url, assessment_criteria, meetings } = req.body;
+  const course = db.courses.find(c => c.id === id);
+  if (!course) return res.status(404).json({ error: 'Mata kuliah tidak ditemukan' });
+
+  let syllabusIndex = db.syllabuses.findIndex(s => s.course_id === id);
+  if (syllabusIndex === -1) {
+    const newSyl = {
+      id: `syl_${id}`,
+      course_id: id,
+      course_name: course.name,
+      academic_year: '2026/2027',
+      semester: 'Semester 1',
+      rps_document_url: rps_document_url || '',
+      drive_folder_url: drive_folder_url || '',
+      assessment_criteria: assessment_criteria || { attendance: 10, tasks: 20, uts: 35, uas: 35 },
+      meetings: meetings || [],
+    };
+    db.syllabuses.push(newSyl);
+    syllabusIndex = db.syllabuses.length - 1;
+  } else {
+    db.syllabuses[syllabusIndex] = {
+      ...db.syllabuses[syllabusIndex],
+      rps_document_url: rps_document_url ?? db.syllabuses[syllabusIndex].rps_document_url,
+      drive_folder_url: drive_folder_url ?? db.syllabuses[syllabusIndex].drive_folder_url,
+      assessment_criteria: assessment_criteria ?? db.syllabuses[syllabusIndex].assessment_criteria,
+      meetings: meetings ?? db.syllabuses[syllabusIndex].meetings,
+    };
+  }
+
+  res.json({ success: true, syllabus: db.syllabuses[syllabusIndex] });
+});
+
+// --- WEBHOOKS & BOT PENGINGAT ---
+apiRouter.get('/webhooks/config', (req: AuthenticatedRequest, res: Response) => {
+  res.json({
+    config: db.webhookConfig,
+    logs: db.webhookLogs,
+  });
+});
+
+apiRouter.put('/webhooks/config', (req: AuthenticatedRequest, res: Response) => {
+  const { whatsapp_webhook_url, telegram_bot_token, telegram_chat_id, is_enabled, events } = req.body;
+  
+  db.webhookConfig = {
+    ...db.webhookConfig,
+    whatsapp_webhook_url: whatsapp_webhook_url !== undefined ? whatsapp_webhook_url : db.webhookConfig.whatsapp_webhook_url,
+    telegram_bot_token: telegram_bot_token !== undefined ? telegram_bot_token : db.webhookConfig.telegram_bot_token,
+    telegram_chat_id: telegram_chat_id !== undefined ? telegram_chat_id : db.webhookConfig.telegram_chat_id,
+    is_enabled: is_enabled !== undefined ? is_enabled : db.webhookConfig.is_enabled,
+    events: events !== undefined ? events : db.webhookConfig.events,
+    last_triggered_at: new Date().toISOString(),
+  };
+
+  db.logAudit({
+    userId: req.user!.id,
+    action: 'UPDATE_WEBHOOK_CONFIG',
+    entityType: 'SystemSettings',
+    entityId: db.webhookConfig.id,
+    ip: req.ip || '127.0.0.1',
+  });
+
+  res.json({ success: true, config: db.webhookConfig });
+});
+
+apiRouter.post('/webhooks/test', async (req: AuthenticatedRequest, res: Response) => {
+  const { message, target } = req.body;
+  const testMessage = message || 'Tes konektivitas Webhook Bot Notifikasi Kelas 01SAKP014 berhasil terhubung dengan lancar.';
+  
+  const log = await db.dispatchWebhook('TEST_PING', 'Tes Webhook Notifikasi', testMessage);
+  res.json({ success: true, log });
+});
+
+apiRouter.post('/webhooks/trigger-reminder', async (req: AuthenticatedRequest, res: Response) => {
+  // Check upcoming assignments (deadline < 48h)
+  const now = new Date().getTime();
+  const upcomingAssignments = db.assignments.filter(a => {
+    const diff = new Date(a.deadline).getTime() - now;
+    return diff > 0 && diff <= 48 * 3600000;
+  });
+
+  const remindersSent: string[] = [];
+
+  for (const asg of upcomingAssignments) {
+    const hoursLeft = Math.round((new Date(asg.deadline).getTime() - now) / 3600000);
+    const msg = `⚠️ PENGINGAT DEADLINE TUGAS (H-${Math.ceil(hoursLeft / 24)})\n\nMata Kuliah: ${asg.course_name || 'Matkul'}\nJudul: ${asg.title}\nSisa Waktu: ±${hoursLeft} Jam lagi\nBatas Pengumpulan: ${new Date(asg.deadline).toLocaleString('id-ID')}\n\nSegera kumpulkan link Google Drive / tugas Anda melalui aplikasi Kelas Manajer.`;
+    await db.dispatchWebhook('PENGINGAT_TUGAS_H1', `H-1 Deadline: ${asg.title}`, msg);
+    remindersSent.push(asg.title);
+  }
+
+  // Check upcoming meetings (<24h)
+  const upcomingMeetings = db.meetings.filter(m => {
+    const diff = new Date(m.date).getTime() - now;
+    return diff > 0 && diff <= 24 * 3600000;
+  });
+
+  for (const meet of upcomingMeetings) {
+    const msg = `📅 PENGINGAT RAPAT KELAS\n\nAgenda: ${meet.title}\nWaktu: ${meet.date} (${meet.start_time} - ${meet.end_time})\nLokasi: ${meet.location}\n\nHarap hadir tepat waktu demi kelancaran koordinasi kelas 01SAKP014.`;
+    await db.dispatchWebhook('PENGINGAT_RAPAT', `Rapat: ${meet.title}`, msg);
+    remindersSent.push(`Rapat: ${meet.title}`);
+  }
+
+  if (remindersSent.length === 0) {
+    const generalMsg = `✅ Semua jadwal tugas dan agenda perkuliahan terpantau aman terkendali. Tidak ada deadline mendesak dalam 24 jam ke depan.`;
+    await db.dispatchWebhook('BOT_CHECK_STATUS', 'Status Terkini Kelas 01SAKP014', generalMsg);
+  }
+
+  res.json({
+    success: true,
+    triggeredCount: remindersSent.length,
+    remindersSent,
+    logs: db.webhookLogs,
+  });
+});
+
+// --- PAYMENT GATEWAY (MIDTRANS / XENDIT / QRIS / VA) ---
+apiRouter.get('/payments/config', (req: AuthenticatedRequest, res: Response) => {
+  res.json(db.paymentGatewayConfig);
+});
+
+apiRouter.put('/payments/config', (req: AuthenticatedRequest, res: Response) => {
+  const { provider, is_active, merchant_id, client_key, server_key, enable_va_bca, enable_va_mandiri, enable_va_bri, enable_va_bni, enable_qris } = req.body;
+  
+  db.paymentGatewayConfig = {
+    ...db.paymentGatewayConfig,
+    provider: provider ?? db.paymentGatewayConfig.provider,
+    is_active: is_active ?? db.paymentGatewayConfig.is_active,
+    merchant_id: merchant_id ?? db.paymentGatewayConfig.merchant_id,
+    client_key: client_key ?? db.paymentGatewayConfig.client_key,
+    server_key: server_key ?? db.paymentGatewayConfig.server_key,
+    enable_va_bca: enable_va_bca ?? db.paymentGatewayConfig.enable_va_bca,
+    enable_va_mandiri: enable_va_mandiri ?? db.paymentGatewayConfig.enable_va_mandiri,
+    enable_va_bri: enable_va_bri ?? db.paymentGatewayConfig.enable_va_bri,
+    enable_va_bni: enable_va_bni ?? db.paymentGatewayConfig.enable_va_bni,
+    enable_qris: enable_qris ?? db.paymentGatewayConfig.enable_qris,
+  };
+
+  db.logAudit({
+    userId: req.user!.id,
+    action: 'UPDATE_PAYMENT_GATEWAY_CONFIG',
+    entityType: 'PaymentGateway',
+    entityId: 'pg_config',
+    ip: req.ip || '127.0.0.1',
+  });
+
+  res.json({ success: true, config: db.paymentGatewayConfig });
+});
+
+apiRouter.post('/payments/generate-va', (req: AuthenticatedRequest, res: Response) => {
+  const { bill_id, bank } = req.body;
+  const bill = db.bills.find(b => b.id === bill_id);
+  if (!bill) return res.status(404).json({ error: 'Tagihan tidak ditemukan' });
+
+  // Generate realistic 16-digit Virtual Account
+  const bankPrefixes: Record<string, string> = {
+    bca: '88000',
+    mandiri: '89022',
+    bri: '10293',
+    bni: '98800',
+  };
+
+  const selectedBank = (bank || 'bca').toLowerCase();
+  const prefix = bankPrefixes[selectedBank] || '88000';
+  const rawNim = req.user?.nim || '261011201000';
+  const vaNumber = `${prefix}${rawNim.slice(-8)}${Math.floor(100 + Math.random() * 900)}`;
+
+  const expiresAt = new Date(Date.now() + 24 * 3600000).toISOString();
+
+  res.json({
+    success: true,
+    va_number: vaNumber,
+    bank: selectedBank.toUpperCase(),
+    amount: bill.amount,
+    bill_title: bill.title,
+    expires_at: expiresAt,
+    instructions: [
+      `1. Buka aplikasi m-Banking atau ATM ${selectedBank.toUpperCase()}.`,
+      `2. Pilih menu Transfer / Bayar > Virtual Account.`,
+      `3. Masukkan nomor Virtual Account: ${vaNumber}`,
+      `4. Periksa rincian: Iuran Kas Kelas 01SAKP014 - Rp ${bill.amount.toLocaleString('id-ID')}`,
+      `5. Konfirmasi pembayaran dan simpan bukti transaksi (status kas akan otomatis lunas).`,
+    ],
+  });
+});
+
+apiRouter.post('/payments/generate-qris', (req: AuthenticatedRequest, res: Response) => {
+  const { bill_id } = req.body;
+  const bill = db.bills.find(b => b.id === bill_id);
+  if (!bill) return res.status(404).json({ error: 'Tagihan tidak ditemukan' });
+
+  const qrisString = `00020101021226600016ID.CO.QRIS.WWW01189360091801SAKP014520458125303360540${bill.amount}5802ID5920KAS KELAS 01SAKP0146009TANGERANG61051541762070703A016304`;
+
+  res.json({
+    success: true,
+    qris_string: qrisString,
+    amount: bill.amount,
+    bill_title: bill.title,
+    merchant_name: 'KAS KELAS 01SAKP014 UNPAM',
+    expires_at: new Date(Date.now() + 15 * 60000).toISOString(), // 15 mins
+  });
+});
+
+// Instant payment simulation & webhook trigger
+apiRouter.post('/payments/webhook-simulate', async (req: AuthenticatedRequest, res: Response) => {
+  const { bill_id, payment_method, user_id } = req.body;
+  const bill = db.bills.find(b => b.id === bill_id);
+  if (!bill) return res.status(404).json({ error: 'Tagihan tidak ditemukan' });
+
+  const targetUserId = user_id || req.user!.id;
+  const targetUser = db.users.find(u => u.id === targetUserId);
+
+  // Update existing payment or create one
+  let payment = db.payments.find(p => p.bill_id === bill_id && p.user_id === targetUserId);
+  if (payment) {
+    payment.status = 'paid';
+    payment.paid_amount = bill.amount;
+    payment.paid_at = new Date().toISOString();
+    payment.payment_method = (payment_method || 'Virtual Account BCA') as any;
+  } else {
+    payment = {
+      id: `pay_${Date.now()}`,
+      bill_id,
+      user_id: targetUserId,
+      user_name: targetUser?.name || 'Mahasiswa',
+      user_nim: targetUser?.nim || '',
+      amount: bill.amount,
+      paid_amount: bill.amount,
+      status: 'paid',
+      payment_method: (payment_method || 'Virtual Account BCA') as any,
+      paid_at: new Date().toISOString(),
+    };
+    db.payments.push(payment);
+  }
+
+  // Create real transaction in general ledger automatically
+  const transaction = {
+    id: `trx_pg_${Date.now()}`,
+    code: `TRX-${Date.now().toString().slice(-6)}`,
+    class_id: db.classInfo.id,
+    type: 'income' as const,
+    amount: bill.amount,
+    category_id: 'cat_kas_rutin',
+    category_name: 'Kas Rutin Bulanan',
+    description: `[Auto Payment Gateway] Iuran Kas ${bill.title} - ${targetUser?.name || 'Mahasiswa'}`,
+    date: new Date().toISOString().split('T')[0],
+    receipt_url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=500&q=80',
+    created_by: 'system_payment_gateway',
+    creator_name: 'Payment Gateway (Auto)',
+    is_deleted: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  db.transactions.push(transaction);
+
+  // Push user notification
+  db.pushNotification({
+    userId: targetUserId,
+    title: `Pembayaran Berhasil Diterima`,
+    message: `Pembayaran iuran ${bill.title} sebesar Rp ${bill.amount.toLocaleString('id-ID')} via ${payment_method || 'Payment Gateway'} telah terverifikasi otomatis.`,
+    type: 'payment',
+    link: '/my-kas',
+  });
+
+  // Dispatch Webhook Notification
+  await db.dispatchWebhook(
+    'PEMBAYARAN_KAS_LUNAS',
+    `Kas Diterima: ${targetUser?.name}`,
+    `Pembayaran iuran kas "${bill.title}" dari ${targetUser?.name} (${targetUser?.nim}) sebesar Rp ${bill.amount.toLocaleString('id-ID')} via ${payment_method || 'Payment Gateway'} telah terverifikasi lunas secara otomatis.`
+  );
+
+  // Log audit
+  db.logAudit({
+    userId: targetUserId,
+    action: 'AUTO_PAYMENT_VERIFIED',
+    entityType: 'Finance',
+    entityId: payment.id,
+    newValue: { amount: bill.amount, method: payment_method },
+    ip: req.ip || '127.0.0.1',
+  });
+
+  res.json({
+    success: true,
+    message: 'Pembayaran berhasil diproses dan diverifikasi otomatis',
+    payment,
+    transaction,
+  });
+});
+

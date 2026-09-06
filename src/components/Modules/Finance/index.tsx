@@ -25,11 +25,13 @@ import {
 import { Badge } from '../../UI/Badge.tsx';
 import { Modal } from '../../UI/Modal.tsx';
 import { WhatsAppShareModal } from './WhatsAppShareModal.tsx';
+import { KasChecklistTable } from './KasChecklistTable.tsx';
 import { googleWorkspace } from '../../../services/googleWorkspace.ts';
+import { CheckSquare } from 'lucide-react';
 
 export const FinanceModule: React.FC = () => {
   const { hasPermission, classInfo, googleAccessToken, loginWithGoogle } = useAuth();
-  const [activeTab, setActiveTab] = useState<'transactions' | 'bills' | 'payments'>('transactions');
+  const [activeTab, setActiveTab] = useState<'kas-table' | 'transactions' | 'bills' | 'payments'>('kas-table');
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<TransactionCategory[]>([]);
@@ -347,11 +349,22 @@ export const FinanceModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Tabs Switcher: Transaksi Buku Kas vs Tagihan & Verifikasi */}
-      <div className="border-b border-slate-200 flex items-center gap-6 text-sm font-semibold">
+      {/* Tabs Switcher: Tabel Kas Checklist vs Transaksi vs Verifikasi vs Tagihan */}
+      <div className="border-b border-slate-200 flex items-center gap-6 text-sm font-semibold overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('kas-table')}
+          className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+            activeTab === 'kas-table'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <CheckSquare className="w-4 h-4" /> Tabel Kas (Absensi 1 - 39)
+        </button>
+
         <button
           onClick={() => setActiveTab('transactions')}
-          className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+          className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'transactions'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -362,7 +375,7 @@ export const FinanceModule: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('payments')}
-          className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+          className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'payments'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -378,7 +391,7 @@ export const FinanceModule: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('bills')}
-          className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+          className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'bills'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -387,6 +400,9 @@ export const FinanceModule: React.FC = () => {
           <Calendar className="w-4 h-4" /> Daftar Tagihan Kas
         </button>
       </div>
+
+      {/* Tab Content 0: Interactive Kas Checklist Table */}
+      {activeTab === 'kas-table' && <KasChecklistTable />}
 
       {/* Tab Content 1: Transactions Table */}
       {activeTab === 'transactions' && (

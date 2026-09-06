@@ -21,9 +21,10 @@ import { AuditLogsModule } from './components/Modules/AuditLogs/index.tsx';
 import { SettingsModule } from './components/Modules/Settings/index.tsx';
 import { CoursesModule } from './components/Modules/Courses/index.tsx';
 import { GlobalSearchModal } from './components/UI/GlobalSearchModal.tsx';
+import { GoogleRoleClaimModal } from './components/Auth/GoogleRoleClaimModal.tsx';
 
 const AppContent: React.FC = () => {
-  const { user, role, isLoading } = useAuth();
+  const { user, role, isLoading, claimStatus } = useAuth();
   const [currentModule, setCurrentModule] = useState<string>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -128,6 +129,11 @@ const AppContent: React.FC = () => {
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         onSelectModule={(mod) => setCurrentModule(mod)}
+      />
+
+      {/* Google Sign-in Identity & Role Claim Modal */}
+      <GoogleRoleClaimModal
+        isOpen={claimStatus.requiresClaim || claimStatus.isPendingApproval}
       />
     </div>
   );

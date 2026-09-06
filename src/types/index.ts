@@ -304,7 +304,7 @@ export interface NotificationItem {
   user_id: string;
   title: string;
   message: string;
-  type: 'bill' | 'payment' | 'announcement' | 'agenda' | 'task' | 'schedule' | 'poll' | 'document';
+  type: 'bill' | 'payment' | 'announcement' | 'agenda' | 'task' | 'schedule' | 'poll' | 'document' | 'role_request' | 'system';
   link?: string;
   is_read: boolean;
   created_at: string;
@@ -375,3 +375,120 @@ export interface AssignmentSubmission {
   status: 'submitted' | 'late' | 'graded';
   grade?: string;
 }
+
+export interface SyllabusMeeting {
+  meeting_no: number;
+  topic: string;
+  subtopics: string[];
+  learning_outcome: string;
+  material_url?: string;
+  presentation_url?: string;
+}
+
+export interface CourseSyllabus {
+  id: string;
+  course_id: string;
+  course_name: string;
+  academic_year: string;
+  semester: string;
+  rps_document_url?: string;
+  drive_folder_url?: string;
+  assessment_criteria?: {
+    attendance: number;
+    tasks: number;
+    uts: number;
+    uas: number;
+  };
+  meetings: SyllabusMeeting[];
+}
+
+export type AgendaEvent = EventItem;
+
+export interface WebhookConfig {
+  id: string;
+  whatsapp_webhook_url: string;
+  telegram_bot_token: string;
+  telegram_chat_id: string;
+  is_enabled: boolean;
+  events: {
+    announcements: boolean;
+    assignment_deadline_h1: boolean;
+    kas_bill: boolean;
+    meetings: boolean;
+  };
+  last_triggered_at?: string;
+}
+
+export interface WebhookLog {
+  id: string;
+  event: string;
+  target: 'whatsapp' | 'telegram' | 'both';
+  payload_summary: string;
+  status: 'success' | 'failed' | 'simulated';
+  timestamp: string;
+}
+
+export interface PaymentGatewayConfig {
+  provider: 'midtrans' | 'xendit' | 'simulated';
+  is_active: boolean;
+  merchant_id?: string;
+  client_key?: string;
+  server_key?: string;
+  enable_va_bca: boolean;
+  enable_va_mandiri: boolean;
+  enable_va_bri: boolean;
+  enable_va_bni: boolean;
+  enable_qris: boolean;
+}
+
+export interface RoleClaimRequest {
+  id: string;
+  google_email: string;
+  google_name: string;
+  google_photo?: string;
+  google_avatar?: string;
+  google_uid?: string;
+  target_user_id?: string;
+  target_user_name?: string;
+  target_user_nim?: string;
+  user_id?: string;
+  user_name?: string;
+  user_nim?: string;
+  requested_user_id?: string;
+  requested_role_id: string;
+  requested_role_name: string;
+  role_name?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  message?: string;
+  notes?: string;
+  created_at: string;
+  updated_at?: string;
+  reviewed_at?: string;
+  reviewed_by?: string;
+}
+
+export interface KasCollectionColumn {
+  id: string;
+  title: string;
+  date: string;
+  amount: number;
+  period_type: 'daily' | 'weekly' | 'event' | 'monthly';
+  created_by: string;
+  created_at: string;
+}
+
+export interface KasChecklistEntry {
+  id: string;
+  column_id: string;
+  user_id: string;
+  user_name: string;
+  user_nim: string;
+  is_paid: boolean;
+  paid_amount: number;
+  paid_at?: string;
+  payment_method?: string;
+  notes?: string;
+  updated_by?: string;
+}
+
+

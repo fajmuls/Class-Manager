@@ -20,6 +20,11 @@ interface AuthContextType {
   firebaseUser: FirebaseUser | null;
   googleAccessToken: string | null;
   isSuperAdmin: boolean;
+  claimStatus: {
+    requiresClaim: boolean;
+    isPendingApproval: boolean;
+    claimRequest?: any;
+  };
   hasPermission: (permission: PermissionCode) => boolean;
   switchUser: (userId: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
@@ -41,6 +46,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [googleAccessToken, setGoogleAccessTokenState] = useState<string | null>(getAccessToken());
+  const [claimStatus, setClaimStatus] = useState<{
+    requiresClaim: boolean;
+    isPendingApproval: boolean;
+    claimRequest?: any;
+  }>({
+    requiresClaim: false,
+    isPendingApproval: false,
+  });
 
   const loadInitialData = async (activeEmail?: string) => {
     try {
@@ -74,10 +87,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             photoURL: fbUser.photoURL,
             uid: fbUser.uid,
           });
-          setUser(res.user);
-          setRole(res.role);
-          setPermissions(res.permissions as PermissionCode[]);
-          setClassInfo(res.classInfo);
+
+          if (res.requiresClaim || res.isPendingApproval) {
+            setClaimStatus({
+              requiresClaim: Boolean(res.requiresClaim),
+              isPendingApproval: Boolean(res.isPendingApproval),
+              claimRequest: res.claimRequest,
+            });
+          } else {
+            setClaimStatus({
+              requiresClaim: false,
+              isPendingApproval: false,
+            });
+          }
+
+          if (res.user) {
+            setUser(res.user);
+            setRole(res.role);
+            setPermissions(res.permissions as PermissionCode[]);
+            setClassInfo(res.classInfo);
+          }
           const usersList = await api.getAllUsers();
           setAllUsers(usersList);
         } catch (err) {
@@ -87,6 +116,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsLoading(false);
         }
       } else {
+        setClaimStatus({ requiresClaim: false, isPendingApproval: false });
         await loadInitialData();
       }
     });
@@ -108,10 +138,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           photoURL: res.user.photoURL,
           uid: res.user.uid,
         });
-        setUser(syncRes.user);
-        setRole(syncRes.role);
-        setPermissions(syncRes.permissions as PermissionCode[]);
-        setClassInfo(syncRes.classInfo);
+
+        if (syncRes.requiresClaim || syncRes.isPendingApproval) {
+          setClaimStatus({
+            requiresClaim: Boolean(syncRes.requiresClaim),
+            isPendingApproval: Boolean(syncRes.isPendingApproval),
+            claimRequest: syncRes.claimRequest,
+          });
+        } else {
+          setClaimStatus({
+            requiresClaim: false,
+            isPendingApproval: false,
+          });
+        }
+
+        if (syncRes.user) {
+          setUser(syncRes.user);
+          setRole(syncRes.role);
+          setPermissions(syncRes.permissions as PermissionCode[]);
+          setClassInfo(syncRes.classInfo);
+        }
         const usersList = await api.getAllUsers();
         setAllUsers(usersList);
       }
@@ -129,6 +175,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await signOutFirebase();
       setGoogleAccessTokenState(null);
       setFirebaseUser(null);
+      setClaimStatus({ requiresClaim: false, isPendingApproval: false });
       await api.switchUser('usr_superadmin');
       await loadInitialData();
     } catch (err) {
@@ -140,6 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const isSuperAdmin = Boolean(
     user?.email?.toLowerCase() === 'mrachmanfm@gmail.com' ||
+    firebaseUser?.email?.toLowerCase() === 'mrachmanfm@gmail.com' ||
     role?.id === 'role_superadmin'
   );
 
@@ -174,6 +222,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const refreshAuth = async () => {
+    setClaimStatus({ requiresClaim: false, isPendingApproval: false });
     await loadInitialData();
   };
 
@@ -193,6 +242,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         firebaseUser,
         googleAccessToken,
         isSuperAdmin,
+        claimStatus,
         hasPermission,
         switchUser,
         loginWithGoogle,

@@ -42,6 +42,45 @@ export const TransparencyModule: React.FC = () => {
     });
   }, []);
 
+  const expenseAllocations = React.useMemo(() => {
+    const expenses = transactions.filter((t) => t.type === 'expense' && !t.deleted_at);
+    const totalExp = expenses.reduce((acc, curr) => acc + curr.amount, 0);
+
+    const map: Record<string, number> = {
+      cat_print: 0,
+      cat_konsumsi: 0,
+      cat_perlengkapan: 0,
+    };
+
+    expenses.forEach((t) => {
+      map[t.category_id] = (map[t.category_id] || 0) + t.amount;
+    });
+
+    return [
+      {
+        id: 'cat_print',
+        name: 'Operasional & ATK',
+        amount: map.cat_print || 0,
+        color: 'bg-blue-600',
+        percent: totalExp > 0 ? Math.round(((map.cat_print || 0) / totalExp) * 100) : 0,
+      },
+      {
+        id: 'cat_konsumsi',
+        name: 'Konsumsi & Acara Rapat',
+        amount: map.cat_konsumsi || 0,
+        color: 'bg-amber-500',
+        percent: totalExp > 0 ? Math.round(((map.cat_konsumsi || 0) / totalExp) * 100) : 0,
+      },
+      {
+        id: 'cat_perlengkapan',
+        name: 'Sewa & Perlengkapan / Sosial',
+        amount: map.cat_perlengkapan || 0,
+        color: 'bg-purple-500',
+        percent: totalExp > 0 ? Math.round(((map.cat_perlengkapan || 0) / totalExp) * 100) : 0,
+      },
+    ];
+  }, [transactions]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -109,29 +148,23 @@ export const TransparencyModule: React.FC = () => {
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-            <p className="text-xs text-slate-500">Operasional & ATK</p>
-            <p className="text-base font-bold text-slate-800 mt-1">Rp 100.000</p>
-            <div className="w-full bg-slate-200 h-1.5 rounded-full mt-2 overflow-hidden">
-              <div className="bg-blue-600 h-full w-[25%]" />
+          {expenseAllocations.map((alloc) => (
+            <div key={alloc.id} className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+              <p className="text-xs text-slate-500">{alloc.name}</p>
+              <p className="text-base font-bold text-slate-800 mt-1">
+                Rp {alloc.amount.toLocaleString('id-ID')}
+              </p>
+              <div className="w-full bg-slate-200 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div
+                  className={`${alloc.color} h-full transition-all duration-300`}
+                  style={{ width: `${alloc.percent}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-slate-400 mt-1 inline-block">
+                {alloc.percent}% dari total beban
+              </span>
             </div>
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-            <p className="text-xs text-slate-500">Konsumsi & Acara Rapat</p>
-            <p className="text-base font-bold text-slate-800 mt-1">Rp 150.000</p>
-            <div className="w-full bg-slate-200 h-1.5 rounded-full mt-2 overflow-hidden">
-              <div className="bg-amber-500 h-full w-[38%]" />
-            </div>
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
-            <p className="text-xs text-slate-500">Dana Sosial & Kepedulian</p>
-            <p className="text-base font-bold text-slate-800 mt-1">Rp 150.000</p>
-            <div className="w-full bg-slate-200 h-1.5 rounded-full mt-2 overflow-hidden">
-              <div className="bg-purple-500 h-full w-[38%]" />
-            </div>
-          </div>
+          ))}
         </div>
       </div>
 

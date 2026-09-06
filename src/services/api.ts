@@ -17,10 +17,17 @@ import {
   NotificationItem,
   AuditLog,
   FinanceSummary,
+  CourseSyllabus,
+  WebhookConfig,
+  WebhookLog,
+  PaymentGatewayConfig,
+  RoleClaimRequest,
+  KasCollectionColumn,
+  KasChecklistEntry,
 } from '../types/index.ts';
 
 class ApiService {
-  private currentUserId: string = 'usr_superadmin';
+  private currentUserId: string = 'usr_member_01';
 
   setUserId(id: string) {
     this.currentUserId = id;
@@ -29,7 +36,7 @@ class ApiService {
 
   getUserId(): string {
     if (!this.currentUserId) {
-      this.currentUserId = localStorage.getItem('cms_user_id') || 'usr_superadmin';
+      this.currentUserId = localStorage.getItem('cms_user_id') || 'usr_member_01';
     }
     return this.currentUserId;
   }
@@ -64,8 +71,28 @@ class ApiService {
     displayName: string | null;
     photoURL: string | null;
     uid: string;
-  }): Promise<{ success: boolean; user: User; role: Role; permissions: string[]; classInfo: ClassInfo }> {
-    const res = await this.request<{ success: boolean; user: User; role: Role; permissions: string[]; classInfo: ClassInfo }>('/auth/google-login', {
+  }): Promise<{
+    success: boolean;
+    user?: User;
+    role?: Role;
+    permissions?: string[];
+    classInfo?: ClassInfo;
+    requiresClaim?: boolean;
+    isPendingApproval?: boolean;
+    isApproved?: boolean;
+    claimRequest?: RoleClaimRequest;
+  }> {
+    const res = await this.request<{
+      success: boolean;
+      user?: User;
+      role?: Role;
+      permissions?: string[];
+      classInfo?: ClassInfo;
+      requiresClaim?: boolean;
+      isPendingApproval?: boolean;
+      isApproved?: boolean;
+      claimRequest?: RoleClaimRequest;
+    }>('/auth/google-login', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -73,6 +100,45 @@ class ApiService {
       this.setUserId(res.user.id);
     }
     return res;
+  }
+
+  async claimRole(payload: {
+    google_email: string;
+    google_name: string;
+    google_avatar: string;
+    google_uid: string;
+    requested_user_id: string;
+    requested_role_id: string;
+    notes?: string;
+  }): Promise<{ success: boolean; claimRequest: RoleClaimRequest }> {
+    return this.request('/auth/claim-role', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getRoleClaimRequests(): Promise<RoleClaimRequest[]> {
+    return this.request('/auth/claim-requests');
+  }
+
+  async approveRoleClaim(
+    claimId: string,
+    roleId?: string
+  ): Promise<{ success: boolean; claim: RoleClaimRequest; user: User }> {
+    return this.request(`/auth/claim-requests/${claimId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ role_id: roleId }),
+    });
+  }
+
+  async rejectRoleClaim(
+    claimId: string,
+    reason?: string
+  ): Promise<{ success: boolean; claim: RoleClaimRequest }> {
+    return this.request(`/auth/claim-requests/${claimId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
   }
 
   async assignUserRole(userId: string, roleId: string): Promise<{ success: boolean; user: User; role: Role }> {
@@ -415,6 +481,135 @@ class ApiService {
   // System Backup
   async getSystemBackup(): Promise<any> {
     return this.request('/system/backup');
+  }
+
+  // Course Syllabus & RPS
+  async getCourseSyllabus(courseId: string): Promise<CourseSyllabus> {
+    return this.request(`/courses/${courseId}/syllabus`);
+  }
+
+  async updateCourseSyllabus(courseId: string, data: Partial<CourseSyllabus>): Promise<{ success: boolean; syllabus: CourseSyllabus }> {
+    return this.request(`/courses/${courseId}/syllabus`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Webhooks & Bot
+  async getWebhookConfig(): Promise<{ config: WebhookConfig; logs: WebhookLog[] }> {
+    return this.request('/webhooks/config');
+  }
+
+  async updateWebhookConfig(data: Partial<WebhookConfig>): Promise<{ success: boolean; config: WebhookConfig }> {
+    return this.request('/webhooks/config', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async testWebhook(message?: string, target?: string): Promise<{ success: boolean; log: WebhookLog }> {
+    return this.request('/webhooks/test', {
+      method: 'POST',
+      body: JSON.stringify({ message, target }),
+    });
+  }
+
+  async triggerBotReminder(): Promise<{ success: boolean; triggeredCount: number; remindersSent: string[]; logs: WebhookLog[] }> {
+    return this.request('/webhooks/trigger-reminder', {
+      method: 'POST',
+    });
+  }
+
+  // Payment Gateway
+  async getPaymentGatewayConfig(): Promise<PaymentGatewayConfig> {
+    return this.request('/payments/config');
+  }
+
+  async updatePaymentGatewayConfig(data: Partial<PaymentGatewayConfig>): Promise<{ success: boolean; config: PaymentGatewayConfig }> {
+    return this.request('/payments/config', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async generateVirtualAccount(bill_id: string, bank: string): Promise<any> {
+    return this.request('/payments/generate-va', {
+      method: 'POST',
+      body: JSON.stringify({ bill_id, bank }),
+    });
+  }
+
+  async generateQRIS(bill_id: string): Promise<any> {
+    return this.request('/payments/generate-qris', {
+      method: 'POST',
+      body: JSON.stringify({ bill_id }),
+    });
+  }
+
+  async simulatePaymentGatewayWebhook(bill_id: string, payment_method: string, user_id?: string): Promise<any> {
+    return this.request('/payments/webhook-simulate', {
+      method: 'POST',
+      body: JSON.stringify({ bill_id, payment_method, user_id }),
+    });
+  }
+
+  // Kas Table (Checklist 1 - 39)
+  async getKasTable(): Promise<{
+    columns: KasCollectionColumn[];
+    entries: KasChecklistEntry[];
+    students: User[];
+  }> {
+    return this.request('/finance/kas-table');
+  }
+
+  async toggleKasChecklist(payload: {
+    column_id: string;
+    user_id: string;
+    is_paid: boolean;
+    payment_method?: string;
+    notes?: string;
+  }): Promise<{ success: boolean; entry: KasChecklistEntry }> {
+    return this.request('/finance/kas-checklist/toggle', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async createKasColumn(payload: {
+    title: string;
+    date?: string;
+    amount: number;
+    period_type?: string;
+  }): Promise<KasCollectionColumn> {
+    return this.request('/finance/kas-columns', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async deleteKasColumn(columnId: string): Promise<{ success: boolean }> {
+    return this.request(`/finance/kas-columns/${columnId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Semesters & Academic Settings
+  async getSemesters(): Promise<any[]> {
+    return this.request('/settings/semesters');
+  }
+
+  async setActiveSemester(semesterId: string): Promise<any> {
+    return this.request('/settings/active-semester', {
+      method: 'POST',
+      body: JSON.stringify({ semesterId }),
+    });
+  }
+
+  async addSemester(payload: { name: string; academic_year: string }): Promise<any> {
+    return this.request('/settings/semesters', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   }
 }
 
