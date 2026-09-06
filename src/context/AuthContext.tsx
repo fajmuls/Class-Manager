@@ -61,7 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadInitialData = async (activeEmail?: string) => {
     try {
-      setIsLoading(true);
+      // Don't set isLoading(true) here if it's already loading from effect
       const [meData, usersList] = await Promise.all([
         api.getMe(),
         api.getAllUsers(),
@@ -74,23 +74,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setAllUsers(usersList);
     } catch (err) {
       console.error('Failed to load user or class data:', err);
-    } finally {
-      setIsLoading(false);
     }
   };
 
   useEffect(() => {
+    let isMounted = true;
+
     // Listen to Firebase Auth state
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (!isMounted) return;
+      
       setFirebaseUser(fbUser);
-      if (fbUser && fbUser.email) {
-        try {
+      
+      try {
+        if (fbUser && fbUser.email) {
+          // Try to sync with backend
           const res = await api.googleLogin({
             email: fbUser.email,
             displayName: fbUser.displayName,
             photoURL: fbUser.photoURL,
             uid: fbUser.uid,
           });
+
+          if (!isMounted) return;
 
           if (res.requiresClaim || res.isPendingApproval) {
             setClaimStatus({
@@ -111,21 +117,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setPermissions(res.permissions as PermissionCode[]);
             setClassInfo(res.classInfo);
           }
+          
+          // Pre-load users list
           const usersList = await api.getAllUsers();
-          setAllUsers(usersList);
-        } catch (err) {
-          console.error('Failed to sync google login with backend:', err);
+          if (isMounted) setAllUsers(usersList);
+        } else {
+          setClaimStatus({ requiresClaim: false, isPendingApproval: false });
           await loadInitialData();
-        } finally {
-          setIsLoading(false);
         }
-      } else {
-        setClaimStatus({ requiresClaim: false, isPendingApproval: false });
-        await loadInitialData();
+      } catch (err) {
+        console.error('Auth synchronization error:', err);
+        if (isMounted) await loadInitialData();
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   const loginWithGoogle = async () => {

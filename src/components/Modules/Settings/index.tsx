@@ -24,6 +24,8 @@ import {
   Layers,
   Plus,
   CalendarCheck,
+  History,
+  X,
 } from 'lucide-react';
 
 export const SettingsModule: React.FC = () => {
@@ -42,8 +44,63 @@ export const SettingsModule: React.FC = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // App version according to user instruction
-  const APP_VERSION = 'v2.6.1';
-  const BUILD_DATE = '6 September 2026 (Authorized Domain Helper & Direct Bypass)';
+  const APP_VERSION = 'v2.6.4';
+  const BUILD_DATE = '6 September 2026 (Auth Stability & Performance)';
+
+  const PATCH_NOTES = [
+    {
+      version: 'v2.6.4',
+      date: '6 September 2026',
+      type: 'Improvements',
+      notes: [
+        'Memperbaiki masalah "kedap-kedip" (infinite loading loop) saat inisialisasi aplikasi.',
+        'Peningkatan stabilitas sinkronisasi status antara Firebase dan Backend.',
+        'Optimasi polling notifikasi untuk mengurangi beban server saat user belum login.',
+      ]
+    },
+    {
+      version: 'v2.6.3',
+      date: '6 September 2026',
+      type: 'Bug Fixes',
+      notes: [
+        'Meningkatkan ketahanan sistem terhadap error "Failed to fetch" saat startup.',
+        'Penambahan logging mendalam pada sisi server untuk melacak kegagalan routing API.',
+        'Optimalisasi pemuatan daftar mahasiswa pada modal klaim identitas.',
+      ]
+    },
+    {
+      version: 'v2.6.2',
+      date: '6 September 2026',
+      type: 'Bug Fixes',
+      notes: [
+        'Memperbaiki alur verifikasi identitas (Google Role Claim) yang tidak muncul saat login.',
+        'Sinkronisasi field name antara frontend dan backend untuk klaim identitas.',
+        'Peningkatan ketahanan AuthContext terhadap error 404 dari API.',
+        'Penyaringan otomatis list mahasiswa agar tidak menampilkan Super Admin.',
+      ]
+    },
+    {
+      version: 'v2.6.1',
+      date: '6 September 2026',
+      type: 'Improvements',
+      notes: [
+        'Penambahan Authorized Domain Helper untuk mengatasi error domain Firebase.',
+        'Fitur Login Bypass untuk pengujian cepat oleh Admin.',
+      ]
+    },
+    {
+      version: 'v2.6.0',
+      date: '5 September 2026',
+      type: 'Major Update',
+      notes: [
+        'Integrasi PWA (Progressive Web App) untuk akses offline.',
+        'Modul Manajemen Semester dan Tahun Akademik.',
+        'Peningkatan keamanan RBAC pada API endpoints.',
+      ]
+    }
+  ];
+
+  const [showPatchNotes, setShowPatchNotes] = useState(false);
 
   // Semester Management
   const [semesters, setSemesters] = useState<any[]>([]);
@@ -211,6 +268,12 @@ export const SettingsModule: React.FC = () => {
               Versi Terpasang
             </span>
             <span className="text-lg font-mono font-bold text-indigo-300">{APP_VERSION}</span>
+            <button 
+              onClick={() => setShowPatchNotes(true)}
+              className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-0.5 rounded border border-slate-700 transition-colors cursor-pointer"
+            >
+              Lihat Patch Notes
+            </button>
             <span className="text-xs text-slate-400">({BUILD_DATE})</span>
             <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold">
               Firebase: fajmuls-learning
@@ -717,6 +780,58 @@ export const SettingsModule: React.FC = () => {
           </div>
         </div>
       </div>
+      {/* Patch Notes Modal */}
+      {showPatchNotes && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-xl">
+                  <History className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Catatan Rilis (Patch Notes)</h3>
+                  <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider">Riwayat Pembaruan Sistem</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowPatchNotes(false)}
+                className="p-2 hover:bg-slate-200 rounded-full transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="p-6 max-h-[60vh] overflow-y-auto space-y-6">
+              {PATCH_NOTES.map((patch) => (
+                <div key={patch.version} className="relative pl-6 border-l-2 border-slate-100 space-y-2">
+                  <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-white border-2 border-blue-500" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-slate-900">{patch.version}</span>
+                    <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-bold">{patch.type}</span>
+                    <span className="text-[10px] text-slate-400 ml-auto">{patch.date}</span>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {patch.notes.map((note, idx) => (
+                      <li key={idx} className="text-xs text-slate-600 flex gap-2">
+                        <span className="text-blue-400 mt-1">•</span>
+                        <span>{note}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
+              <button 
+                onClick={() => setShowPatchNotes(false)}
+                className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

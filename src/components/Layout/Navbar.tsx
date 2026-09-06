@@ -25,6 +25,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onOpenSearch })
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   useEffect(() => {
+    if (!user?.id) return;
+
     const fetchNotifs = async () => {
       try {
         const list = await api.getNotifications();

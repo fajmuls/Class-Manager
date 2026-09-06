@@ -44,12 +44,22 @@ export const GoogleRoleClaimModal: React.FC<GoogleRoleClaimModalProps> = ({
   useEffect(() => {
     const init = async () => {
       try {
-        const [uList, rList] = await Promise.all([
-          api.getAllUsers(),
-          api.getRoles(),
-        ]);
-        // Sort students alphabetically A to Z
-        const sorted = [...uList].sort((a, b) => a.name.localeCompare(b.name, 'id-ID'));
+        let uList = allUsers;
+        // If context doesn't have users yet, try fetching
+        if (uList.length === 0) {
+          try {
+            uList = await api.getAllUsers();
+          } catch (e) {
+            console.error('Initial user fetch failed, trying again in modal...', e);
+          }
+        }
+        
+        const rList = await api.getRoles();
+        
+        // Filter out superadmin and sort students A-Z
+        const filteredStudents = uList.filter(u => u.role_id !== 'role_superadmin');
+        const sorted = [...filteredStudents].sort((a, b) => a.name.localeCompare(b.name, 'id-ID'));
+        
         setStudents(sorted);
         setRoles(rList);
         if (sorted.length > 0) {
@@ -59,8 +69,10 @@ export const GoogleRoleClaimModal: React.FC<GoogleRoleClaimModalProps> = ({
         console.error('Failed to load students for claim:', err);
       }
     };
-    init();
-  }, []);
+    if (isOpen) {
+      init();
+    }
+  }, [isOpen, allUsers.length]);
 
   // Check current claim status on open or mount
   useEffect(() => {

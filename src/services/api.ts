@@ -42,23 +42,32 @@ class ApiService {
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const url = `/api${endpoint}`;
+    console.log(`API Request: ${options.method || 'GET'} ${url}`);
+    
     const headers = {
       'Content-Type': 'application/json',
       'x-user-id': this.getUserId(),
       ...(options.headers || {}),
     };
 
-    const response = await fetch(`/api${endpoint}`, {
-      ...options,
-      headers,
-    });
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+      });
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({ error: response.statusText }));
-      throw new Error(errData.error || `HTTP error ${response.status}`);
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ error: response.statusText }));
+        console.error(`API Error: ${response.status} ${url}`, errData);
+        throw new Error(errData.error || `HTTP error ${response.status}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error(`API Fetch Failure: ${url}`, error);
+      throw error;
     }
-
-    return response.json();
   }
 
   // Auth & Profiles

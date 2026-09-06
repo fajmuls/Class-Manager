@@ -17,6 +17,7 @@ import {
 } from '../../src/types/index.ts';
 
 export const apiRouter = Router();
+console.log('API Router initialized');
 
 // Current active demo user state on server
 let currentGlobalUserId = 'usr_superadmin';
@@ -135,26 +136,46 @@ apiRouter.post('/auth/google-login', (req, res: Response) => {
 });
 
 apiRouter.post('/auth/claim-role', async (req, res: Response) => {
-  const { email, displayName, photoURL, target_user_id, requested_role_id, message } = req.body;
-  if (!email || !target_user_id) {
+  const { 
+    google_email, 
+    google_name, 
+    google_avatar, 
+    requested_user_id, 
+    requested_role_id, 
+    notes,
+    // Support old names just in case
+    email,
+    displayName,
+    photoURL,
+    target_user_id,
+    message
+  } = req.body;
+
+  const finalEmail = google_email || email;
+  const finalName = google_name || displayName;
+  const finalPhoto = google_avatar || photoURL;
+  const finalTargetUserId = requested_user_id || target_user_id;
+  const finalMessage = notes || message;
+
+  if (!finalEmail || !finalTargetUserId) {
     return res.status(400).json({ error: 'Email dan pilihan identitas mahasiswa diperlukan' });
   }
 
-  const targetUser = db.users.find(u => u.id === target_user_id);
+  const targetUser = db.users.find(u => u.id === finalTargetUserId);
   const targetRole = db.roles.find(r => r.id === requested_role_id) || db.roles.find(r => r.id === 'role_anggota');
 
   if (!targetUser) {
     return res.status(404).json({ error: 'Data mahasiswa tidak ditemukan' });
   }
 
-  const existingClaim = db.roleClaimRequests.find(c => c.google_email.toLowerCase() === email.toLowerCase());
+  const existingClaim = db.roleClaimRequests.find(c => c.google_email.toLowerCase() === finalEmail.toLowerCase());
   if (existingClaim && existingClaim.status === 'pending') {
     existingClaim.target_user_id = targetUser.id;
     existingClaim.target_user_name = targetUser.name;
     existingClaim.target_user_nim = targetUser.nim;
     existingClaim.requested_role_id = targetRole?.id || 'role_anggota';
     existingClaim.requested_role_name = targetRole?.name || 'Anggota';
-    existingClaim.message = message || '';
+    existingClaim.message = finalMessage || '';
     existingClaim.updated_at = new Date().toISOString();
 
     return res.json({ success: true, claimRequest: existingClaim });
@@ -162,16 +183,16 @@ apiRouter.post('/auth/claim-role', async (req, res: Response) => {
 
   const newClaim: RoleClaimRequest = {
     id: `claim_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    google_email: email,
-    google_name: displayName || email.split('@')[0],
-    google_photo: photoURL,
+    google_email: finalEmail,
+    google_name: finalName || finalEmail.split('@')[0],
+    google_photo: finalPhoto,
     target_user_id: targetUser.id,
     target_user_name: targetUser.name,
     target_user_nim: targetUser.nim,
     requested_role_id: targetRole?.id || 'role_anggota',
     requested_role_name: targetRole?.name || 'Anggota',
     status: 'pending',
-    message: message || '',
+    message: finalMessage || '',
     created_at: new Date().toISOString(),
   };
 
@@ -208,7 +229,8 @@ apiRouter.get('/auth/claim-requests', (_req, res: Response) => {
 
 apiRouter.post('/auth/claim-requests/:id/approve', (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
-  const { assigned_role_id } = req.body;
+  const { assigned_role_id, role_id } = req.body;
+  const finalRoleId = assigned_role_id || role_id;
 
   const claim = db.roleClaimRequests.find(c => c.id === id);
   if (!claim) {
@@ -223,7 +245,7 @@ apiRouter.post('/auth/claim-requests/:id/approve', (req: AuthenticatedRequest, r
   if (targetUser) {
     targetUser.email = claim.google_email;
     if (claim.google_photo) targetUser.avatar = claim.google_photo;
-    const finalRole = db.roles.find(r => r.id === (assigned_role_id || claim.requested_role_id));
+    const finalRole = db.roles.find(r => r.id === (finalRoleId || claim.requested_role_id));
     if (finalRole) {
       targetUser.role_id = finalRole.id;
       targetUser.role_name = finalRole.name;
