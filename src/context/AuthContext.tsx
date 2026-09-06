@@ -9,6 +9,7 @@ import {
   setAccessToken,
 } from '../services/firebase.ts';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { UnauthorizedDomainModal } from '../components/Auth/UnauthorizedDomainModal.tsx';
 
 interface AuthContextType {
   user: User | null;
@@ -28,6 +29,8 @@ interface AuthContextType {
   hasPermission: (permission: PermissionCode) => boolean;
   switchUser: (userId: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
+  loginWithEmailDirect: (email: string, displayName?: string) => Promise<void>;
+  openDomainHelper: () => void;
   logoutGoogle: () => Promise<void>;
   assignUserRole: (userId: string, roleId: string) => Promise<void>;
   refreshAuth: () => Promise<void>;
@@ -46,6 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [googleAccessToken, setGoogleAccessTokenState] = useState<string | null>(getAccessToken());
+  const [showDomainModal, setShowDomainModal] = useState(false);
   const [claimStatus, setClaimStatus] = useState<{
     requiresClaim: boolean;
     isPendingApproval: boolean;
@@ -163,11 +167,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (err: any) {
       console.error('Google Sign In Error:', err);
-      alert(err.message || 'Gagal login dengan Google');
+      const errMsg = err?.message || String(err);
+      if (
+        errMsg.includes('auth/unauthorized-domain') ||
+        err?.code === 'auth/unauthorized-domain' ||
+        errMsg.includes('unauthorized-domain')
+      ) {
+        // Otomatis buka modal panduan otorisasi domain & bypass login
+        setShowDomainModal(true);
+      } else {
+        alert(err.message || 'Gagal login dengan Google');
+      }
     } finally {
       setIsLoading(false);
     }
   };
+
+  const loginWithEmailDirect = async (email: string, displayName?: string) => {
+    try {
+      setIsLoading(true);
+      const cleanEmail = email.trim();
+      const cleanName = displayName?.trim() || cleanEmail.split('@')[0];
+      const syncRes = await api.googleLogin({
+        email: cleanEmail,
+        displayName: cleanName,
+        photoURL: `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=2563eb&color=fff`,
+        uid: `manual_${Date.now()}_${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
+      });
+
+      if (syncRes.requiresClaim || syncRes.isPendingApproval) {
+        setClaimStatus({
+          requiresClaim: Boolean(syncRes.requiresClaim),
+          isPendingApproval: Boolean(syncRes.isPendingApproval),
+          claimRequest: syncRes.claimRequest,
+        });
+      } else {
+        setClaimStatus({
+          requiresClaim: false,
+          isPendingApproval: false,
+        });
+      }
+
+      if (syncRes.user) {
+        setUser(syncRes.user);
+        setRole(syncRes.role);
+        setPermissions(syncRes.permissions as PermissionCode[]);
+        setClassInfo(syncRes.classInfo);
+      }
+      const usersList = await api.getAllUsers();
+      setAllUsers(usersList);
+      setShowDomainModal(false);
+    } catch (err: any) {
+      console.error('Direct Login Error:', err);
+      alert(err.message || 'Gagal masuk akun');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const openDomainHelper = () => setShowDomainModal(true);
 
   const logoutGoogle = async () => {
     try {
@@ -246,6 +304,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hasPermission,
         switchUser,
         loginWithGoogle,
+        loginWithEmailDirect,
+        openDomainHelper,
         logoutGoogle,
         assignUserRole,
         refreshAuth,
@@ -254,6 +314,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }}
     >
       {children}
+      <UnauthorizedDomainModal
+        isOpen={showDomainModal}
+        onClose={() => setShowDomainModal(false)}
+      />
     </AuthContext.Provider>
   );
 };

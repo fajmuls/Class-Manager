@@ -15,12 +15,12 @@ service cloud.firestore {
     }
 
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return isSignedIn() && (request.auth.uid == userId || request.auth.token.email == userId);
     }
 
     // Connection test document
-    match /test/connection {
-      allow read: if isSignedIn();
+    match /test/{docId} {
+      allow read: if true;
       allow write: if false;
     }
 
@@ -31,22 +31,133 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
-    // Role assignments (Super Admin only write, all members can read their roles)
+    // Role Claim Requests (Google Auth Claim Flow)
+    match /roleClaimRequests/{claimId} {
+      allow read: if isSignedIn() && (request.auth.token.email == resource.data.google_email || isSuperAdmin());
+      allow create: if isSignedIn();
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // Role assignments (Super Admin only write, all members can read)
     match /roleAssignments/{assignmentId} {
       allow read: if isSignedIn();
       allow write: if isSuperAdmin();
     }
 
-    // Transactions
+    // Class Information & Metadata
+    match /classInfo/{classId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    // Semesters & Academic Settings
+    match /semesters/{semesterId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    // Courses & Syllabuses
+    match /courses/{courseId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    match /syllabuses/{syllabusId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    // Finance: Transactions, Bills, Payments
     match /transactions/{transactionId} {
       allow read: if isSignedIn();
       allow write: if isSuperAdmin();
     }
 
-    // Announcements
+    match /bills/{billId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && (isOwner(resource.data.user_id) || isSuperAdmin() || !exists(resource));
+      allow delete: if isSuperAdmin();
+    }
+
+    // Kas Matrix & Checklist (Absensi 1 - 39)
+    match /kasColumns/{columnId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    match /kasEntries/{entryId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isSuperAdmin();
+    }
+
+    // Announcements & News
     match /announcements/{announcementId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isSuperAdmin();
+      allow write: if isSuperAdmin();
+    }
+
+    // Meetings & Minutes
+    match /meetings/{meetingId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    // Tasks & Assignments
+    match /tasks/{taskId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isSuperAdmin();
+    }
+
+    // Documents & Archive
+    match /documents/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isSuperAdmin();
+    }
+
+    // Polls & Voting
+    match /polls/{pollId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isSuperAdmin();
+      allow update: if isSignedIn();
+    }
+
+    // Attendances
+    match /attendances/{attendanceId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    // Notifications
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && (
+        resource.data.user_id == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.user_id == 'all' ||
+        isSuperAdmin()
+      );
+      allow create, update: if isSignedIn();
+      allow delete: if isSuperAdmin();
+    }
+
+    // Audit Logs
+    match /auditLogs/{logId} {
+      allow read: if isSuperAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    // System & Webhook Config
+    match /systemSettings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
     }
   }
 }

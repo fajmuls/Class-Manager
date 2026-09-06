@@ -1,11 +1,11 @@
 {
-  "projectId": "enduring-kiln-f8gvj",
-  "appId": "1:1014746870447:web:182c7a962d300cdec39a5a",
-  "apiKey": "AIzaSyCW5CPsKCD-_7SixCChS-At0iLrylo58YA",
-  "authDomain": "enduring-kiln-f8gvj.firebaseapp.com",
-  "storageBucket": "enduring-kiln-f8gvj.firebasestorage.app",
-  "messagingSenderId": "1014746870447",
+  "projectId": "fajmuls-learning",
+  "appId": "1:1078635450652:web:a6e6706f237d32100caad9",
+  "apiKey": "AIzaSyDg_cmH4Z2qHZp-SZ9OqfKyqrT7d0M0ET0",
+  "authDomain": "fajmuls-learning.firebaseapp.com",
+  "storageBucket": "fajmuls-learning.firebasestorage.app",
+  "messagingSenderId": "1078635450652",
   "measurementId": "",
-  "oAuthClientId": "1014746870447-12g0b1h8hh84l1gbqc292sj14s1mso0d.apps.googleusercontent.com",
+  "oAuthClientId": "",
   "recaptchaSiteKey": ""
 }

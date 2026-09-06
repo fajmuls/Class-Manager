@@ -42,8 +42,8 @@ export const SettingsModule: React.FC = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // App version according to user instruction
-  const APP_VERSION = 'v2.5.0';
-  const BUILD_DATE = '6 September 2026';
+  const APP_VERSION = 'v2.6.1';
+  const BUILD_DATE = '6 September 2026 (Authorized Domain Helper & Direct Bypass)';
 
   // Semester Management
   const [semesters, setSemesters] = useState<any[]>([]);
@@ -206,12 +206,15 @@ export const SettingsModule: React.FC = () => {
       {/* App Version Card (Required by custom instruction) */}
       <div className="p-6 bg-[#0F172A] rounded-2xl text-white shadow-sm border border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-wider">
               Versi Terpasang
             </span>
             <span className="text-lg font-mono font-bold text-indigo-300">{APP_VERSION}</span>
             <span className="text-xs text-slate-400">({BUILD_DATE})</span>
+            <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold">
+              Firebase: fajmuls-learning
+            </span>
           </div>
           <h3 className="text-base font-bold text-white">Class Management System (CMS Pro 01SAKP014)</h3>
           <p className="text-xs text-slate-300">
