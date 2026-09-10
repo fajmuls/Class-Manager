@@ -18,19 +18,27 @@ import {
   X,
   Clock,
   Filter,
+  MessageCircle,
+  Receipt,
+  Send,
+  Share2,
 } from 'lucide-react';
 import { Badge } from '../../UI/Badge.tsx';
 import { Modal } from '../../UI/Modal.tsx';
 import { googleWorkspace } from '../../../services/googleWorkspace.ts';
+import { exportKasReceiptToPDF } from '../../../utils/exportHelpers.ts';
 
 export const KasChecklistTable: React.FC = () => {
-  const { hasPermission, googleAccessToken, loginWithGoogle, classInfo } = useAuth();
+  const { hasPermission, googleAccessToken, loginWithGoogle, classInfo, user } = useAuth();
   const [columns, setColumns] = useState<KasCollectionColumn[]>([]);
   const [entries, setEntries] = useState<KasChecklistEntry[]>([]);
   const [students, setStudents] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterPeriod, setFilterPeriod] = useState<string>('all');
+
+  // WhatsApp Broadcast Modal
+  const [isWaBroadcastModalOpen, setIsWaBroadcastModalOpen] = useState(false);
 
   // Modal create column
   const [isColModalOpen, setIsColModalOpen] = useState(false);
@@ -282,6 +290,15 @@ export const KasChecklistTable: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setIsWaBroadcastModalOpen(true)}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+            title="Kirim Notifikasi Tagihan WhatsApp ke Semua Mahasiswa Menunggak"
+          >
+            <MessageCircle className="w-4 h-4" />
+            <span>Kirim Tagihan WA</span>
+          </button>
+
           <button
             onClick={handleExportGoogleSheets}
             disabled={isExportingSheets}
@@ -543,22 +560,74 @@ export const KasChecklistTable: React.FC = () => {
                         );
                       })}
 
-                      {/* Student Summary */}
+                      {/* Student Summary & Actions */}
                       <td className="p-3 text-right sticky right-0 bg-white group-hover:bg-blue-50/40 z-10 border-l border-slate-200">
-                        <span className="font-bold text-slate-900 block">
-                          Rp {studentTotalPaid.toLocaleString('id-ID')}
-                        </span>
-                        <span
-                          className={`text-[10px] font-semibold ${
-                            studentUnpaidCount === 0
-                              ? 'text-emerald-600'
-                              : 'text-amber-600'
-                          }`}
-                        >
-                          {studentUnpaidCount === 0
-                            ? '✓ Lunas Semua'
-                            : `${studentUnpaidCount} belum bayar`}
-                        </span>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="font-bold text-slate-900 block">
+                            Rp {studentTotalPaid.toLocaleString('id-ID')}
+                          </span>
+                          <span
+                            className={`text-[10px] font-semibold ${
+                              studentUnpaidCount === 0
+                                ? 'text-emerald-600'
+                                : 'text-amber-600'
+                            }`}
+                          >
+                            {studentUnpaidCount === 0
+                              ? '✓ Lunas Semua'
+                              : `${studentUnpaidCount} belum bayar`}
+                          </span>
+
+                          <div className="flex items-center gap-1 mt-1 opacity-90 group-hover:opacity-100">
+                            {studentUnpaidCount > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const unpaidCols = filteredColumns.filter((c) => !entryMap.get(`${c.id}_${student.id}`)?.is_paid);
+                                  const totalOwed = unpaidCols.reduce((sum, c) => sum + c.amount, 0);
+                                  const colList = unpaidCols.map((c) => `• ${c.title} (Rp ${c.amount.toLocaleString('id-ID')})`).join('\n');
+                                  const text = `Halo ${student.name} (${student.nim}),\n\nKami menginformasikan rekapan iuran kas kelas *${classInfo?.name || '01 SAKP 14'}*.\n\nSaat ini terdapat ${unpaidCols.length} tagihan kas yang belum diselesaikan:\n${colList}\n\n*Total Tagihan:* Rp ${totalOwed.toLocaleString('id-ID')}\n\nSilakan melakukan pembayaran tunai ke Bendahara Kelas atau transfer, lalu kirimkan bukti pembayarannya ya. Terima kasih! 🙏`;
+                                  const phone = student.phone ? student.phone.replace(/[^0-9]/g, '') : '';
+                                  const finalPhone = phone.startsWith('0') ? '62' + phone.slice(1) : phone;
+                                  window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(text)}`, '_blank');
+                                }}
+                                title="Kirim Tagihan Kas ke WhatsApp Mahasiswa"
+                                className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                              >
+                                <MessageCircle className="w-3 h-3 text-emerald-600" />
+                                <span>Tagih WA</span>
+                              </button>
+                            )}
+
+                            {studentTotalPaid > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const paidCols = filteredColumns.filter((c) => entryMap.get(`${c.id}_${student.id}`)?.is_paid);
+                                  const paidTitle = paidCols.map((c) => c.title).join(', ');
+                                  exportKasReceiptToPDF(
+                                    {
+                                      receiptNumber: `KWT-${student.nim.slice(-4)}-${Date.now().toString().slice(-4)}`,
+                                      studentName: student.name,
+                                      studentNim: student.nim,
+                                      amount: studentTotalPaid,
+                                      paymentFor: `Iuran Kas Kelas: ${paidTitle || 'Periode Berjalan'}`,
+                                      paymentMethod: 'Transfer Bank / QRIS Kas Kelas',
+                                      date: new Date().toISOString(),
+                                      treasurerName: user?.name || 'Bendahara Kelas',
+                                    },
+                                    classInfo
+                                  );
+                                }}
+                                title="Cetak / Unduh Kwitansi Digital Lunas"
+                                className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                              >
+                                <Receipt className="w-3 h-3 text-blue-600" />
+                                <span>Kwitansi</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -568,6 +637,70 @@ export const KasChecklistTable: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Modal: Broadcast Tagihan WhatsApp */}
+      <Modal
+        isOpen={isWaBroadcastModalOpen}
+        onClose={() => setIsWaBroadcastModalOpen(false)}
+        title="Pengingat Tagihan Kas WhatsApp"
+        subtitle="Daftar mahasiswa yang memiliki tunggakan kas kelas beserta format pesan siap kirim"
+      >
+        <div className="space-y-4 text-xs">
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800">
+            <p className="font-semibold">Perhatian Bendahara Kelas:</p>
+            <p className="mt-0.5 text-[11px] text-amber-700 leading-relaxed">
+              Klik tombol "Kirim WA" pada masing-masing mahasiswa di bawah untuk langsung membuka percakapan WhatsApp dengan teks penagihan sopan otomatis.
+            </p>
+          </div>
+
+          <div className="max-h-[360px] overflow-y-auto space-y-2 divide-y divide-slate-100">
+            {sortedStudents
+              .map((s) => {
+                const unpaid = filteredColumns.filter((c) => !entryMap.get(`${c.id}_${s.id}`)?.is_paid);
+                const totalOwed = unpaid.reduce((sum, c) => sum + c.amount, 0);
+                return { student: s, unpaid, totalOwed };
+              })
+              .filter((item) => item.unpaid.length > 0)
+              .map((item, idx) => (
+                <div key={item.student.id} className="pt-2 flex items-center justify-between gap-2">
+                  <div>
+                    <p className="font-bold text-slate-800">
+                      {idx + 1}. {item.student.name}
+                    </p>
+                    <p className="text-[11px] text-slate-400 font-mono">
+                      NIM: {item.student.nim} • {item.unpaid.length} tunggakan ({item.unpaid.map((c) => c.title).join(', ')})
+                    </p>
+                    <p className="text-[11px] font-bold text-rose-600 mt-0.5">
+                      Total: Rp {item.totalOwed.toLocaleString('id-ID')}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const colList = item.unpaid.map((c) => `• ${c.title} (Rp ${c.amount.toLocaleString('id-ID')})`).join('\n');
+                      const text = `Halo ${item.student.name} (${item.student.nim}),\n\nKami menginformasikan rekapan iuran kas kelas *${classInfo?.name || '01 SAKP 14'}*.\n\nSaat ini terdapat ${item.unpaid.length} tagihan kas yang belum diselesaikan:\n${colList}\n\n*Total Tagihan:* Rp ${item.totalOwed.toLocaleString('id-ID')}\n\nSilakan melakukan pembayaran tunai ke Bendahara Kelas atau transfer, lalu kirimkan bukti pembayarannya ya. Terima kasih! 🙏`;
+                      const phone = item.student.phone ? item.student.phone.replace(/[^0-9]/g, '') : '';
+                      const finalPhone = phone.startsWith('0') ? '62' + phone.slice(1) : phone;
+                      window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(text)}`, '_blank');
+                    }}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center gap-1 shrink-0 cursor-pointer shadow-xs"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Kirim WA</span>
+                  </button>
+                </div>
+              ))}
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={() => setIsWaBroadcastModalOpen(false)}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold cursor-pointer"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Modal: Tambah Kolom Kas Baru */}
       <Modal

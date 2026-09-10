@@ -51,10 +51,24 @@ export const SettingsModule: React.FC = () => {
   const [isExportingBackup, setIsExportingBackup] = useState(false);
 
   // App version according to user instruction
-  const APP_VERSION = 'v3.0.0';
-  const BUILD_DATE = '10 September 2026 (Portal Splash Screen, Master Auto-Approval Passcode, Isolated Cloud Database & PDF/Excel Exports)';
+  const APP_VERSION = 'v3.1.0';
+  const BUILD_DATE = '10 September 2026 (WhatsApp Kas Reminders, Dynamic QR Presence, H-1 Push Notifications, GPA Simulator, Discussion Forum & Interactive Org Chart)';
 
   const PATCH_NOTES = [
+    {
+      version: 'v3.1.0',
+      date: '10 September 2026',
+      type: 'WhatsApp Billing, Dynamic QR Attendance, GPA Calculator, Academic Forum & Org Chart',
+      notes: [
+        'Notifikasi Otomatis Tagihan Kas via WhatsApp: Tombol broadcast tagihan massal untuk seluruh mahasiswa yang menunggak dan tombol tagih 1-klik perorangan dengan format pesan rincian iuran resmi.',
+        'Kwitansi Digital PDF Pembayaran Kas: Ekspor dan cetak kwitansi resmi tanda terima pembayaran kas dengan konversi terbilang Rupiah dan tanggal bayar.',
+        'Presensi QR Code Dinamis: Sistem presensi kuliah pintar dengan rotasi token 6 digit setiap 30 detik dan countdown timer real-time untuk mencegah titip absen.',
+        'Pengingat Deadline Tugas (H-1 Push Notification): Deteksi otomatis tugas kuliah berjarak waktu kurang dari 24 jam dengan izin web browser Push Notification.',
+        'Kalkulator Simulasi IPK & IPS Semester: Simulasi target perolehan nilai mata kuliah (A s/d E) dengan bobot SKS untuk menghitung proyeksi Indeks Prestasi dan predikat kelulusan (Cum Laude).',
+        'Forum Tanya Jawab & Diskusi Kuliah: Papan diskusi terbuka per mata kuliah untuk pembahasan tugas, kisi-kisi UTS/UAS, dan rangkuman materi dengan fitur like serta tanggapan langsung.',
+        'Bagan Struktur Organisasi Interaktif: Visualisasi hierarki kepengurusan kelas (Ketua, Wakil, Sekretaris, Bendahara, PJ Mata Kuliah) dilengkapi kontak WhatsApp dan rincian tupoksi.',
+      ]
+    },
     {
       version: 'v3.0.0',
       date: '10 September 2026',

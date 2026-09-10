@@ -30,13 +30,24 @@ import { Badge } from '../../UI/Badge.tsx';
 import { Modal } from '../../UI/Modal.tsx';
 import { CourseSyllabusModal } from './CourseSyllabusModal.tsx';
 import { generateGoogleCalendarUrl, downloadIcsFile } from '../../../utils/calendarSync.ts';
+import { GpaSimulator } from './GpaSimulator.tsx';
+import { CourseDiscussionForum } from './CourseDiscussionForum.tsx';
+import {
+  Bell,
+  BellRing,
+  Calculator,
+  MessageSquare,
+} from 'lucide-react';
 
 export const CoursesModule: React.FC = () => {
   const { user, role, hasPermission } = useAuth();
-  const [activeTab, setActiveTab] = useState<'courses' | 'assignments'>('courses');
+  const [activeTab, setActiveTab] = useState<'courses' | 'assignments' | 'gpa' | 'forum'>('courses');
   const [courses, setCourses] = useState<Course[]>([]);
   const [assignments, setAssignments] = useState<CourseAssignment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasNotificationPermission, setHasNotificationPermission] = useState(
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission === 'granted' : false
+  );
 
   // Modals
   const [isAddCourseModalOpen, setIsAddCourseModalOpen] = useState(false);
@@ -279,7 +290,7 @@ export const CoursesModule: React.FC = () => {
       </div>
 
       {/* Tabs Switcher */}
-      <div className="border-b border-slate-200 flex items-center gap-6 text-sm font-semibold">
+      <div className="border-b border-slate-200 flex flex-wrap items-center gap-4 sm:gap-6 text-sm font-semibold">
         <button
           onClick={() => setActiveTab('courses')}
           className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
@@ -299,7 +310,29 @@ export const CoursesModule: React.FC = () => {
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <FileText className="w-4 h-4" /> Tugas & Pengumpulan ({assignments.length})
+          <FileText className="w-4 h-4" /> Tugas & Deadline ({assignments.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('gpa')}
+          className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+            activeTab === 'gpa'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Calculator className="w-4 h-4" /> Simulasi IPK & IPS
+        </button>
+
+        <button
+          onClick={() => setActiveTab('forum')}
+          className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+            activeTab === 'forum'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <MessageSquare className="w-4 h-4" /> Forum Tanya Jawab
         </button>
       </div>
 
@@ -396,6 +429,69 @@ export const CoursesModule: React.FC = () => {
       {/* Tab 2: Tugas & Pengumpulan Homework */}
       {activeTab === 'assignments' && (
         <div className="space-y-4">
+          {/* H-1 Push Notification Alert & Permission Banner */}
+          {(() => {
+            const now = Date.now();
+            const urgentAssignments = assignments.filter((a) => {
+              const diffHours = (new Date(a.deadline).getTime() - now) / (1000 * 60 * 60);
+              return diffHours > 0 && diffHours <= 36; // H-1 window
+            });
+
+            return (
+              <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-amber-100 text-amber-700 rounded-xl shrink-0 mt-0.5">
+                    <BellRing className="w-5 h-5 animate-bounce" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-amber-900 text-sm flex items-center gap-2">
+                      Pengingat Deadline Tugas (H-1 Push Notification)
+                      {urgentAssignments.length > 0 && (
+                        <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-bold">
+                          {urgentAssignments.length} Tugas Segera Berakhir!
+                        </span>
+                      )}
+                    </h4>
+                    <p className="text-amber-800 mt-0.5">
+                      {urgentAssignments.length > 0
+                        ? `Perhatian: Tugas "${urgentAssignments[0].title}" (${urgentAssignments[0].course_name}) jatuh tempo kurang dari 24 jam!`
+                        : 'Semua deadline penugasan terorganisir rapi. Aktifkan notifikasi peramban agar Anda tidak melewatkan tenggat pengumpulan.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {!hasNotificationPermission ? (
+                    <button
+                      onClick={async () => {
+                        if ('Notification' in window) {
+                          const perm = await Notification.requestPermission();
+                          if (perm === 'granted') {
+                            setHasNotificationPermission(true);
+                            new Notification('Kelas Manager', {
+                              body: 'Notifikasi Deadline Tugas H-1 berhasil diaktifkan!',
+                            });
+                          }
+                        } else {
+                          alert('Browser Anda tidak mendukung push notification.');
+                        }
+                      }}
+                      className="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                    >
+                      <Bell className="w-3.5 h-3.5" />
+                      <span>Aktifkan Notifikasi H-1</span>
+                    </button>
+                  ) : (
+                    <div className="px-3 py-1.5 bg-emerald-100 text-emerald-800 rounded-xl font-bold flex items-center gap-1.5 border border-emerald-200">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Notifikasi H-1 Aktif</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           {assignments.length === 0 ? (
             <div className="p-12 text-center bg-white rounded-2xl border border-slate-200">
               <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -492,6 +588,12 @@ export const CoursesModule: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* Tab 3: Simulasi IPK & IPS */}
+      {activeTab === 'gpa' && <GpaSimulator courses={courses} />}
+
+      {/* Tab 4: Forum Diskusi & Tanya Jawab */}
+      {activeTab === 'forum' && <CourseDiscussionForum courses={courses} />}
 
       {/* Modal: Tambah Mata Kuliah */}
       <Modal

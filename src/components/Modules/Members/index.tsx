@@ -28,9 +28,12 @@ import {
   saveMemberToFirestore,
   deleteMemberFromFirestore,
 } from '../../../services/firestoreSync.ts';
+import { ClassOrgChart } from './ClassOrgChart.tsx';
+import { Network } from 'lucide-react';
 
 export const MembersModule: React.FC = () => {
   const { hasPermission, classInfo, googleAccessToken, loginWithGoogle, isSuperAdmin } = useAuth();
+  const [activeTab, setActiveTab] = useState<'list' | 'orgchart'>('list');
   const [members, setMembers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [search, setSearch] = useState('');
@@ -288,7 +291,7 @@ export const MembersModule: React.FC = () => {
                 setFormData({ name: '', nim: '', email: '', phone: '', role_id: 'role_anggota', position: 'Anggota' });
                 setIsAddModalOpen(true);
               }}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors shadow-xs"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Tambah Anggota
             </button>
@@ -296,7 +299,36 @@ export const MembersModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
+      {/* Tab Switcher */}
+      <div className="border-b border-slate-200 flex items-center gap-6 text-sm font-semibold">
+        <button
+          onClick={() => setActiveTab('list')}
+          className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+            activeTab === 'list'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Users className="w-4 h-4" /> Data Roster Mahasiswa ({members.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('orgchart')}
+          className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+            activeTab === 'orgchart'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Network className="w-4 h-4" /> Bagan Struktur Organisasi & Pengurus
+        </button>
+      </div>
+
+      {activeTab === 'orgchart' ? (
+        <ClassOrgChart members={members} />
+      ) : (
+        <>
+          {/* Filter and Search Bar */}
       <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Search Box */}
@@ -478,6 +510,8 @@ export const MembersModule: React.FC = () => {
           </table>
         </div>
       </div>
+    </>
+  )}
 
       {/* Modal: Tambah Anggota */}
       <Modal

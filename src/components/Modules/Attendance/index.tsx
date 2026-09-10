@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '../../UI/Badge.tsx';
 import { Modal } from '../../UI/Modal.tsx';
+import { DynamicQrPresence } from './DynamicQrPresence.tsx';
 
 export const AttendanceModule: React.FC = () => {
   const { hasPermission } = useAuth();
@@ -248,23 +249,21 @@ export const AttendanceModule: React.FC = () => {
         </form>
       </Modal>
 
-      {/* Modal QR Code Sesi */}
+      {/* Modal QR Code Dinamis */}
       <Modal
         isOpen={isQrModalOpen}
         onClose={() => setIsQrModalOpen(false)}
-        title="QR Code Presensi Cepat"
+        title="Presensi QR Code Dinamis & Token Real-Time"
+        subtitle="QR Code aman dengan rotasi token otomatis setiap 30 detik untuk mencegah titip absen atau foto QR"
       >
-        <div className="text-center space-y-4">
-          <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200 inline-block mx-auto">
-            <QrCode className="w-48 h-48 text-slate-900 mx-auto" />
-          </div>
-          <div>
-            <p className="text-sm font-bold text-slate-800">{sessionTitle}</p>
-            <p className="text-xs text-slate-500 mt-1">
-              Mahasiswa dapat memindai QR code ini melalui smartphone untuk check-in kehadiran otomatis.
-            </p>
-          </div>
-        </div>
+        <DynamicQrPresence
+          sessionTitle={sessionTitle}
+          sessionDate={sessionDate}
+          members={members}
+          onCheckInSuccess={async (studentName) => {
+            await loadData();
+          }}
+        />
       </Modal>
     </div>
   );

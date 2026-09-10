@@ -1,6 +1,6 @@
 {
-  "name": "Kelas Manajer 01SAKP014",
-  "description": "Sistem administrasi kelas perkuliahan berbasis Role-Based Access Control (RBAC) dengan transparansi kas, agenda, pengumuman, dan tata kelola terintegrasi.",
+  "name": "Kelas Manager",
+  "description": "Sistem informasi dan manajemen kelas perkuliahan terintegrasi dengan Cloud Firestore, transparansi kas, presensi QR, tugas, dan tata kelola kelas.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

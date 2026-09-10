@@ -135,8 +135,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               KM
             </div>
             <div>
-              <p className="text-sm font-bold tracking-tight text-white">Kelas Manajer</p>
-              <p className="text-[11px] text-slate-400 font-medium">01 SAKP 14 • v2.9.0</p>
+              <p className="text-sm font-bold tracking-tight text-white">Kelas Manager</p>
+              <p className="text-[11px] text-slate-400 font-medium">Portal Akademik • v3.1.0</p>
             </div>
           </div>
           <button

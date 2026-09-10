@@ -97,7 +97,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onOpenSearch })
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-400 hidden sm:inline">Workspace /</span>
                 <h1 className="text-sm font-bold text-slate-900 leading-tight">
-                  {classInfo?.name || 'Kelas Manajer 01SAKP014'}
+                  {classInfo?.name || 'Kelas Manager'}
                 </h1>
                 <span className="hidden sm:inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
                   {classInfo?.code || '01SAKP014'}

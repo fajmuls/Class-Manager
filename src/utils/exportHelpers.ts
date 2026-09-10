@@ -631,3 +631,229 @@ export function exportMembersToExcel(members: User[], classInfo?: ClassInfo | nu
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Converts numbers into Indonesian word representation (Terbilang)
+ */
+export function terbilangRupiah(num: number): string {
+  const satuan = ['', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas'];
+  if (num === 0) return 'Nol Rupiah';
+  if (num < 12) return satuan[num] + ' Rupiah';
+  if (num < 20) return terbilangRupiah(num - 10).replace(' Rupiah', '') + ' Belas Rupiah';
+  if (num < 100) return satuan[Math.floor(num / 10)] + ' Puluh ' + (num % 10 !== 0 ? terbilangRupiah(num % 10) : 'Rupiah');
+  if (num < 200) return 'Seratus ' + (num % 100 !== 0 ? terbilangRupiah(num - 100) : 'Rupiah');
+  if (num < 1000) return satuan[Math.floor(num / 100)] + ' Ratus ' + (num % 100 !== 0 ? terbilangRupiah(num % 100) : 'Rupiah');
+  if (num < 2000) return 'Seribu ' + (num % 1000 !== 0 ? terbilangRupiah(num - 1000) : 'Rupiah');
+  if (num < 1000000) return terbilangRupiah(Math.floor(num / 1000)).replace(' Rupiah', '') + ' Ribu ' + (num % 1000 !== 0 ? terbilangRupiah(num % 1000) : 'Rupiah');
+  if (num < 1000000000) return terbilangRupiah(Math.floor(num / 1000000)).replace(' Rupiah', '') + ' Juta ' + (num % 1000000 !== 0 ? terbilangRupiah(num % 1000000) : 'Rupiah');
+  return formatIDR(num);
+}
+
+export interface ReceiptData {
+  receiptNumber: string;
+  studentName: string;
+  studentNim: string;
+  amount: number;
+  paymentFor: string;
+  paymentMethod?: string;
+  date?: string;
+  treasurerName?: string;
+}
+
+/**
+ * Generates an official digital cash receipt (Kwitansi Digital Kas Kelas) in PDF print view
+ */
+export function exportKasReceiptToPDF(receipt: ReceiptData, classInfo?: ClassInfo | null) {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert('Pop-up terblokir. Izinkan pop-up peramban untuk mencetak kwitansi.');
+    return;
+  }
+
+  const className = classInfo?.name || 'Kelas Manager 01 SAKP 14';
+  const majorName = classInfo?.major || 'S1 Akuntansi Perpajakan';
+  const wordsAmount = terbilangRupiah(receipt.amount);
+  const formattedDate = new Date(receipt.date || Date.now()).toLocaleDateString('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Kwitansi Pembayaran Kas - ${receipt.receiptNumber}</title>
+  <style>
+    @page { size: A5 landscape; margin: 10mm; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #1e293b;
+      margin: 0;
+      padding: 12px;
+      background: #f8fafc;
+    }
+    .receipt-card {
+      background: #ffffff;
+      border: 2px solid #3b82f6;
+      border-radius: 12px;
+      padding: 24px;
+      position: relative;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+    }
+    .org-title { font-size: 16px; font-weight: 800; color: #1e3a8a; margin: 0; }
+    .org-sub { font-size: 11px; color: #64748b; margin: 2px 0 0 0; }
+    .receipt-badge {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      padding: 6px 12px;
+      border-radius: 8px;
+      text-align: right;
+    }
+    .receipt-title { font-size: 13px; font-weight: 800; color: #1e40af; margin: 0; text-transform: uppercase; }
+    .receipt-no { font-family: monospace; font-size: 12px; font-weight: 700; color: #2563eb; margin: 2px 0 0 0; }
+    
+    .content-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 14px;
+      font-size: 13px;
+    }
+    .content-table td { padding: 6px 4px; vertical-align: top; }
+    .label { width: 22%; font-weight: 600; color: #475569; }
+    .sep { width: 3%; font-weight: bold; color: #94a3b8; }
+    .val { width: 75%; font-weight: 700; color: #0f172a; }
+    
+    .amount-box {
+      background: #f0fdf4;
+      border: 1px dashed #22c55e;
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .amount-num { font-size: 18px; font-weight: 900; color: #15803d; }
+    .amount-words { font-size: 11px; color: #166534; font-style: italic; }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-top: 10px;
+    }
+    .footer-left { font-size: 10px; color: #94a3b8; }
+    .sign-box { text-align: center; width: 180px; }
+    .sign-date { font-size: 11px; color: #64748b; margin-bottom: 28px; }
+    .sign-name { font-size: 12px; font-weight: 700; color: #0f172a; border-top: 1px solid #cbd5e1; padding-top: 4px; margin: 0; }
+    .sign-role { font-size: 10px; color: #64748b; margin: 0; }
+    
+    .btn-print {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(37,99,235,0.3);
+    }
+    @media print {
+      body { background: transparent; padding: 0; }
+      .btn-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="receipt-card">
+    <div class="header">
+      <div>
+        <h2 class="org-title">TANDA TERIMA PEMBAYARAN KAS</h2>
+        <p class="org-sub">${className} • ${majorName}</p>
+      </div>
+      <div class="receipt-badge">
+        <p class="receipt-title">KWITANSI RESMI</p>
+        <p class="receipt-no">No: ${receipt.receiptNumber}</p>
+      </div>
+    </div>
+
+    <table class="content-table">
+      <tr>
+        <td class="label">Telah Terima Dari</td>
+        <td class="sep">:</td>
+        <td class="val">${receipt.studentName} <span style="font-family: monospace; font-size: 11px; color: #64748b;">(NIM: ${receipt.studentNim})</span></td>
+      </tr>
+      <tr>
+        <td class="label">Uang Sejumlah</td>
+        <td class="sep">:</td>
+        <td class="val" style="color: #16a34a;">${formatIDR(receipt.amount)}</td>
+      </tr>
+      <tr>
+        <td class="label">Terbilang</td>
+        <td class="sep">:</td>
+        <td class="val" style="font-style: italic; color: #334155;">${wordsAmount}</td>
+      </tr>
+      <tr>
+        <td class="label">Untuk Pembayaran</td>
+        <td class="sep">:</td>
+        <td class="val">${receipt.paymentFor}</td>
+      </tr>
+      <tr>
+        <td class="label">Metode Pembayaran</td>
+        <td class="sep">:</td>
+        <td class="val">${receipt.paymentMethod || 'Transfer Bank / QRIS Kas Kelas'}</td>
+      </tr>
+    </table>
+
+    <div class="amount-box">
+      <div>
+        <span style="font-size: 10px; color: #166534; font-weight: 700; text-transform: uppercase;">Total Pembayaran Lunas</span>
+        <div class="amount-num">${formatIDR(receipt.amount)}</div>
+      </div>
+      <div class="amount-words">"${wordsAmount}"</div>
+    </div>
+
+    <div class="footer">
+      <div class="footer-left">
+        <p style="margin:0;">Dicetak otomatis melalui <strong>Kelas Manager</strong></p>
+        <p style="margin:2px 0 0 0;">Bukti sah tanda terima iuran bendahara kelas perkuliahan</p>
+      </div>
+      <div class="sign-box">
+        <div class="sign-date">${formattedDate}</div>
+        <div class="sign-name">${receipt.treasurerName || 'Bendahara Kelas'}</div>
+        <p class="sign-role">Bendahara Kas ${className}</p>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-print" onclick="window.print()">🖨️ Cetak / Simpan PDF</button>
+
+  <script>
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        window.print();
+      }, 500);
+    });
+  </script>
+</body>
+</html>
+  `;
+
+  printWindow.document.open();
+  printWindow.document.write(htmlContent);
+  printWindow.document.close();
+}
