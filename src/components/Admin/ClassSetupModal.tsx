@@ -193,7 +193,7 @@ export const ClassSetupModal: React.FC<ClassSetupModalProps> = ({
                   <input
                     type="text"
                     required
-                    value={formData.name}
+                    value={formData.name || ''}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="Contoh: Kelas 01SAKP014"
                     className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -207,7 +207,7 @@ export const ClassSetupModal: React.FC<ClassSetupModalProps> = ({
                   <input
                     type="text"
                     required
-                    value={formData.code}
+                    value={formData.code || ''}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                     placeholder="Contoh: 01SAKP014"
                     className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase"
@@ -224,7 +224,7 @@ export const ClassSetupModal: React.FC<ClassSetupModalProps> = ({
                   <input
                     type="text"
                     required
-                    value={formData.major}
+                    value={formData.major || ''}
                     onChange={(e) => setFormData({ ...formData, major: e.target.value })}
                     placeholder="Contoh: S1 Akuntansi"
                     className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -239,7 +239,7 @@ export const ClassSetupModal: React.FC<ClassSetupModalProps> = ({
                   <input
                     type="text"
                     required
-                    value={formData.faculty}
+                    value={formData.faculty || ''}
                     onChange={(e) => setFormData({ ...formData, faculty: e.target.value })}
                     placeholder="Contoh: Fakultas Ekonomi dan Bisnis"
                     className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -256,7 +256,7 @@ export const ClassSetupModal: React.FC<ClassSetupModalProps> = ({
                   <input
                     type="text"
                     required
-                    value={formData.academic_year}
+                    value={formData.academic_year || ''}
                     onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
                     placeholder="Contoh: 2026/2027"
                     className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -271,7 +271,7 @@ export const ClassSetupModal: React.FC<ClassSetupModalProps> = ({
                   <input
                     type="text"
                     required
-                    value={formData.semester}
+                    value={formData.semester || ''}
                     onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
                     placeholder="Contoh: Semester 1 (Ganjil)"
                     className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -288,7 +288,7 @@ export const ClassSetupModal: React.FC<ClassSetupModalProps> = ({
                   type="number"
                   min="0"
                   step="1000"
-                  value={formData.monthly_dues_amount}
+                  value={formData.monthly_dues_amount ?? 0}
                   onChange={(e) =>
                     setFormData({ ...formData, monthly_dues_amount: Number(e.target.value) })
                   }
@@ -302,7 +302,7 @@ export const ClassSetupModal: React.FC<ClassSetupModalProps> = ({
                 </label>
                 <textarea
                   rows={2}
-                  value={formData.description}
+                  value={formData.description || ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Deskripsi singkat mengenai kelas..."
                   className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"

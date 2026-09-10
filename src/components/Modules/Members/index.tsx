@@ -430,7 +430,7 @@ export const MembersModule: React.FC = () => {
                         <button
                           onClick={() => {
                             setSelectedMember(m);
-                            setFormData({ ...formData, role_id: m.role_id });
+                            setFormData({ ...formData, role_id: m.role_id || 'role_anggota' });
                             setIsRoleModalOpen(true);
                           }}
                           title="Ubah Role"
@@ -445,12 +445,12 @@ export const MembersModule: React.FC = () => {
                           onClick={() => {
                             setSelectedMember(m);
                             setFormData({
-                              name: m.name,
-                              nim: m.nim,
-                              email: m.email,
-                              phone: m.phone,
-                              role_id: m.role_id,
-                              position: m.position,
+                              name: m.name || '',
+                              nim: m.nim || '',
+                              email: m.email || '',
+                              phone: m.phone || '',
+                              role_id: m.role_id || 'role_anggota',
+                              position: m.position || 'Anggota',
                             });
                             setIsEditModalOpen(true);
                           }}
@@ -492,7 +492,7 @@ export const MembersModule: React.FC = () => {
             <input
               type="text"
               required
-              value={formData.name}
+              value={formData.name || ''}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="Contoh: Raden Wijaya"
               className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500"
@@ -503,7 +503,7 @@ export const MembersModule: React.FC = () => {
             <input
               type="text"
               required
-              value={formData.nim}
+              value={formData.nim || ''}
               onChange={(e) => setFormData({ ...formData, nim: e.target.value })}
               placeholder="Contoh: 2406012410099"
               className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500"
@@ -514,7 +514,7 @@ export const MembersModule: React.FC = () => {
               <label className="block font-semibold text-slate-700 mb-1">Email Kampus</label>
               <input
                 type="email"
-                value={formData.email}
+                value={formData.email || ''}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 placeholder="email@students.ac.id"
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500"
@@ -524,7 +524,7 @@ export const MembersModule: React.FC = () => {
               <label className="block font-semibold text-slate-700 mb-1">Nomor WhatsApp</label>
               <input
                 type="tel"
-                value={formData.phone}
+                value={formData.phone || ''}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="08123456789"
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500"
@@ -535,7 +535,7 @@ export const MembersModule: React.FC = () => {
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Role RBAC</label>
               <select
-                value={formData.role_id}
+                value={formData.role_id || 'role_anggota'}
                 onChange={(e) => setFormData({ ...formData, role_id: e.target.value })}
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500"
               >
@@ -548,7 +548,7 @@ export const MembersModule: React.FC = () => {
               <label className="block font-semibold text-slate-700 mb-1">Jabatan / Posisi</label>
               <input
                 type="text"
-                value={formData.position}
+                value={formData.position || ''}
                 onChange={(e) => setFormData({ ...formData, position: e.target.value })}
                 placeholder="Contoh: PIC Humas / Anggota"
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500"
@@ -585,7 +585,7 @@ export const MembersModule: React.FC = () => {
             <input
               type="text"
               required
-              value={formData.name}
+              value={formData.name || ''}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500"
             />
@@ -595,7 +595,7 @@ export const MembersModule: React.FC = () => {
             <input
               type="text"
               required
-              value={formData.nim}
+              value={formData.nim || ''}
               onChange={(e) => setFormData({ ...formData, nim: e.target.value })}
               className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500"
             />
@@ -605,7 +605,7 @@ export const MembersModule: React.FC = () => {
               <label className="block font-semibold text-slate-700 mb-1">Email</label>
               <input
                 type="email"
-                value={formData.email}
+                value={formData.email || ''}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500"
               />
@@ -614,7 +614,7 @@ export const MembersModule: React.FC = () => {
               <label className="block font-semibold text-slate-700 mb-1">Nomor WhatsApp</label>
               <input
                 type="tel"
-                value={formData.phone}
+                value={formData.phone || ''}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500"
               />
@@ -624,7 +624,7 @@ export const MembersModule: React.FC = () => {
             <label className="block font-semibold text-slate-700 mb-1">Jabatan Kelas</label>
             <input
               type="text"
-              value={formData.position}
+              value={formData.position || ''}
               onChange={(e) => setFormData({ ...formData, position: e.target.value })}
               className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500"
             />
@@ -658,7 +658,7 @@ export const MembersModule: React.FC = () => {
           <div>
             <label className="block font-semibold text-slate-700 mb-1">Pilih Role Baru</label>
             <select
-              value={formData.role_id}
+              value={formData.role_id || 'role_anggota'}
               onChange={(e) => setFormData({ ...formData, role_id: e.target.value })}
               className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500"
             >

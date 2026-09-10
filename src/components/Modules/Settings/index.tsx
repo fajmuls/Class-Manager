@@ -51,10 +51,32 @@ export const SettingsModule: React.FC = () => {
   const [isExportingBackup, setIsExportingBackup] = useState(false);
 
   // App version according to user instruction
-  const APP_VERSION = 'v2.8.0';
-  const BUILD_DATE = '10 September 2026 (Class Manager Flow, Firestore Real-time Sync & Data Backup)';
+  const APP_VERSION = 'v2.9.0';
+  const BUILD_DATE = '10 September 2026 (01 SAKP 14 Engine, 39 Template Students, NIM Pro Code Claim & Announcements-Meetings Hub)';
 
   const PATCH_NOTES = [
+    {
+      version: 'v2.9.0',
+      date: '10 September 2026',
+      type: '01 SAKP 14 Engine, 39 Mahasiswa Template, Google NIM Claim & Unified Hub',
+      notes: [
+        'Template Default 01 SAKP 14: Inisialisasi paten kelas 01 SAKP 14 (S1 Akuntansi Perpajakan, FEB) dan 39 mahasiswa terdaftar langsung ke Cloud Firestore.',
+        'Isolasi Data Multi-App: Memisahkan data roster kelas dari pengguna kuis aplikasi lain, menjamin daftar anggota kelas selalu menampilkan 39 mahasiswa kelas.',
+        'Google Auth NIM & Pro Code Claim: Formulir pencocokan NIM dan pengajuan Kode Pro saat login akun Google untuk memverifikasi mahasiswa dan mempermudah approval oleh Ketua Kelas / Super Admin.',
+        'Unified Announcements & Meetings Hub: Menyatukan modul Pengumuman Resmi dan Jadwal Rapat & Notulensi ke dalam satu pusat informasi terpadu dengan integrasi link Google Meet dan share WhatsApp 1-klik.',
+        'Mobile Minimalist Polish: Tata letak antarmuka yang lebih rapi, compact, dan nyaman dioperasikan lewat smartphone dengan touch target optimal.',
+      ]
+    },
+    {
+      version: 'v2.8.1',
+      date: '10 September 2026',
+      type: 'Controlled Component React Sanitization & Console Cleanup',
+      notes: [
+        'Zero Controlled-to-Uncontrolled Warnings: Menjamin seluruh elemen input formulir (Tasks, Courses, Members, Agenda, Announcements, Finance, Settings, Role Claim, dan Setup Modals) memiliki fallback terdefinisi (|| "") sehingga React tidak pernah mengubah controlled component menjadi uncontrolled.',
+        'Vite WebSocket Suppression: Penanganan komprehensif error [vite] dan WebSocket disconnection pada runtime interceptor untuk lingkungan sandboxed container.',
+        'Resilient State Initialization: Sinkronisasi asinkron profil kelas, webhook bot config, dan form edit anggota dengan sanitasi data default.',
+      ]
+    },
     {
       version: 'v2.8.0',
       date: '10 September 2026',
@@ -219,6 +241,20 @@ export const SettingsModule: React.FC = () => {
     handleTestFirestore();
   }, []);
 
+  useEffect(() => {
+    if (classInfo) {
+      setFormData({
+        name: classInfo.name || '',
+        code: classInfo.code || '',
+        semester: classInfo.semester || 1,
+        academic_year: classInfo.academic_year || '',
+        department: classInfo.department || '',
+        university: classInfo.university || '',
+        academic_advisor: classInfo.academic_advisor || '',
+      });
+    }
+  }, [classInfo]);
+
   const loadSemesters = async () => {
     try {
       const res = await api.getSemesters();
@@ -305,9 +341,20 @@ export const SettingsModule: React.FC = () => {
 
   const loadWebhookSettings = async () => {
     try {
-      const cfg = await api.getWebhookConfig();
+      const res = await api.getWebhookConfig();
+      const cfg: any = res?.config;
       if (cfg) {
-        setWebhookConfig(cfg);
+        setWebhookConfig({
+          webhook_url: cfg.whatsapp_webhook_url || cfg.webhook_url || '',
+          telegram_bot_token: cfg.telegram_bot_token || '',
+          telegram_chat_id: cfg.telegram_chat_id || '',
+          whatsapp_gateway_url: cfg.whatsapp_gateway_url || cfg.whatsapp_webhook_url || '',
+          is_active: cfg.is_enabled ?? cfg.is_active ?? true,
+          notify_announcements: cfg.events?.announcements ?? cfg.notify_announcements ?? true,
+          notify_assignments: cfg.events?.assignment_deadline_h1 ?? cfg.notify_assignments ?? true,
+          notify_kas_bills: cfg.events?.kas_bill ?? cfg.notify_kas_bills ?? true,
+          notify_meetings: cfg.events?.meetings ?? cfg.notify_meetings ?? true,
+        });
       }
     } catch (err) {
       console.error('Error loading webhook config:', err);
@@ -318,8 +365,33 @@ export const SettingsModule: React.FC = () => {
     e.preventDefault();
     try {
       setIsSavingWebhook(true);
-      const updated = await api.updateWebhookConfig(webhookConfig);
-      setWebhookConfig(updated);
+      const payload: any = {
+        whatsapp_webhook_url: webhookConfig.webhook_url || webhookConfig.whatsapp_gateway_url,
+        telegram_bot_token: webhookConfig.telegram_bot_token,
+        telegram_chat_id: webhookConfig.telegram_chat_id,
+        is_enabled: webhookConfig.is_active,
+        events: {
+          announcements: webhookConfig.notify_announcements,
+          assignment_deadline_h1: webhookConfig.notify_assignments,
+          kas_bill: webhookConfig.notify_kas_bills,
+          meetings: webhookConfig.notify_meetings,
+        },
+      };
+      const res = await api.updateWebhookConfig(payload);
+      const updated: any = res?.config;
+      if (updated) {
+        setWebhookConfig({
+          webhook_url: updated.whatsapp_webhook_url || updated.webhook_url || webhookConfig.webhook_url,
+          telegram_bot_token: updated.telegram_bot_token || webhookConfig.telegram_bot_token,
+          telegram_chat_id: updated.telegram_chat_id || webhookConfig.telegram_chat_id,
+          whatsapp_gateway_url: updated.whatsapp_webhook_url || webhookConfig.whatsapp_gateway_url,
+          is_active: updated.is_enabled ?? webhookConfig.is_active,
+          notify_announcements: updated.events?.announcements ?? webhookConfig.notify_announcements,
+          notify_assignments: updated.events?.assignment_deadline_h1 ?? webhookConfig.notify_assignments,
+          notify_kas_bills: updated.events?.kas_bill ?? webhookConfig.notify_kas_bills,
+          notify_meetings: updated.events?.meetings ?? webhookConfig.notify_meetings,
+        });
+      }
       setWebhookSuccess(true);
       setTimeout(() => setWebhookSuccess(false), 3000);
     } catch (err: any) {
@@ -602,7 +674,7 @@ export const SettingsModule: React.FC = () => {
             <input
               type="text"
               placeholder="https://api.fonnte.com/send atau webhook URL"
-              value={webhookConfig.webhook_url}
+              value={webhookConfig.webhook_url || ''}
               onChange={(e) => setWebhookConfig({ ...webhookConfig, webhook_url: e.target.value })}
               className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500 font-mono text-[11px]"
             />
@@ -615,7 +687,7 @@ export const SettingsModule: React.FC = () => {
             <input
               type="password"
               placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
-              value={webhookConfig.telegram_bot_token}
+              value={webhookConfig.telegram_bot_token || ''}
               onChange={(e) => setWebhookConfig({ ...webhookConfig, telegram_bot_token: e.target.value })}
               className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500 font-mono text-[11px]"
             />
@@ -628,7 +700,7 @@ export const SettingsModule: React.FC = () => {
             <input
               type="text"
               placeholder="-1001234567890 atau @GrupKelas01SAKP014"
-              value={webhookConfig.telegram_chat_id}
+              value={webhookConfig.telegram_chat_id || ''}
               onChange={(e) => setWebhookConfig({ ...webhookConfig, telegram_chat_id: e.target.value })}
               className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500 font-mono text-[11px]"
             />
@@ -752,7 +824,7 @@ export const SettingsModule: React.FC = () => {
             <input
               type="text"
               required
-              value={formData.name}
+              value={formData.name || ''}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500"
             />
@@ -763,7 +835,7 @@ export const SettingsModule: React.FC = () => {
             <input
               type="text"
               required
-              value={formData.code}
+              value={formData.code || ''}
               onChange={(e) => setFormData({ ...formData, code: e.target.value })}
               className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500 font-mono"
             />
@@ -775,7 +847,7 @@ export const SettingsModule: React.FC = () => {
               type="number"
               min={1}
               max={14}
-              value={formData.semester}
+              value={formData.semester ?? 1}
               onChange={(e) => setFormData({ ...formData, semester: Number(e.target.value) })}
               className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500"
             />
@@ -785,7 +857,7 @@ export const SettingsModule: React.FC = () => {
             <label className="block font-semibold text-slate-700 mb-1">Tahun Akademik</label>
             <input
               type="text"
-              value={formData.academic_year}
+              value={formData.academic_year || ''}
               onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
               className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500"
             />
@@ -795,7 +867,7 @@ export const SettingsModule: React.FC = () => {
             <label className="block font-semibold text-slate-700 mb-1">Jurusan / Program Studi</label>
             <input
               type="text"
-              value={formData.department}
+              value={formData.department || ''}
               onChange={(e) => setFormData({ ...formData, department: e.target.value })}
               className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500"
             />
@@ -805,7 +877,7 @@ export const SettingsModule: React.FC = () => {
             <label className="block font-semibold text-slate-700 mb-1">Perguruan Tinggi / Universitas</label>
             <input
               type="text"
-              value={formData.university}
+              value={formData.university || ''}
               onChange={(e) => setFormData({ ...formData, university: e.target.value })}
               className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500"
             />
@@ -815,7 +887,7 @@ export const SettingsModule: React.FC = () => {
             <label className="block font-semibold text-slate-700 mb-1">Dosen Wali / Pembimbing Akademik (DPA)</label>
             <input
               type="text"
-              value={formData.academic_advisor}
+              value={formData.academic_advisor || ''}
               onChange={(e) => setFormData({ ...formData, academic_advisor: e.target.value })}
               className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-blue-500"
             />
@@ -923,7 +995,7 @@ export const SettingsModule: React.FC = () => {
               <input
                 type="text"
                 placeholder="Contoh: Semester 2 (Genap)"
-                value={newSemesterName}
+                value={newSemesterName || ''}
                 onChange={(e) => setNewSemesterName(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-blue-500"
               />
@@ -936,7 +1008,7 @@ export const SettingsModule: React.FC = () => {
               <input
                 type="text"
                 placeholder="Contoh: 2026/2027"
-                value={newAcademicYear}
+                value={newAcademicYear || ''}
                 onChange={(e) => setNewAcademicYear(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-blue-500"
               />

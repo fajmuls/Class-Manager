@@ -12,20 +12,32 @@
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <script>
       // Suppress benign WebSocket / Vite dev server HMR disconnection notices
-      window.addEventListener('unhandledrejection', function (e) {
-        var msg = (e && e.reason && (e.reason.message || e.reason)) || '';
-        if (typeof msg === 'string' && (msg.indexOf('WebSocket') !== -1 || msg.indexOf('vite') !== -1)) {
-          e.preventDefault();
-          e.stopImmediatePropagation && e.stopImmediatePropagation();
-        }
-      });
-      window.addEventListener('error', function (e) {
-        var msg = (e && e.message) || '';
-        if (typeof msg === 'string' && (msg.indexOf('WebSocket') !== -1 || msg.indexOf('vite') !== -1)) {
-          e.preventDefault();
-          e.stopImmediatePropagation && e.stopImmediatePropagation();
-        }
-      });
+      (function () {
+        var isBenign = function (msg) {
+          if (!msg) return false;
+          var str = typeof msg === 'string' ? msg : (msg.message || String(msg));
+          return str.indexOf('WebSocket') !== -1 || str.indexOf('[vite]') !== -1;
+        };
+        window.addEventListener('unhandledrejection', function (e) {
+          if (isBenign(e && e.reason)) {
+            e.preventDefault();
+            e.stopImmediatePropagation && e.stopImmediatePropagation();
+          }
+        });
+        window.addEventListener('error', function (e) {
+          if (isBenign(e && e.message) || isBenign(e && e.error)) {
+            e.preventDefault();
+            e.stopImmediatePropagation && e.stopImmediatePropagation();
+          }
+        });
+        var origConsoleError = console.error;
+        console.error = function () {
+          var args = Array.prototype.slice.call(arguments);
+          var first = args[0] ? String(args[0]) : '';
+          if (isBenign(first)) return;
+          origConsoleError.apply(console, args);
+        };
+      })();
     </script>
     <title>Kelas Manajer 01SAKP014</title>
     <meta name="description" content="Sistem administrasi kelas perkuliahan berbasis Role-Based Access Control (RBAC) dengan transparansi kas, agenda, pengumuman, dan tata kelola terintegrasi." />

@@ -11,6 +11,7 @@ import {
   Course,
 } from '../types/index.ts';
 import { saveClassifyUserProfile } from '../lib/firebase.ts';
+import { DEFAULT_CLASS_01SAKP014, TEMPLATE_39_STUDENTS } from './firestoreSync.ts';
 
 // Storage helper with safe try-catch
 function getStored<T>(key: string, defaultVal: T): T {
@@ -31,19 +32,7 @@ function setStored<T>(key: string, val: T): void {
 }
 
 // Initial Class Info
-const INITIAL_CLASS_INFO: ClassInfo = {
-  id: 'cls_01sakp014',
-  name: 'Kelas Manajer 01SAKP014',
-  code: '01SAKP014',
-  academic_year: '2026/2027',
-  semester: 'Semester 1 (Ganjil)',
-  major: 'S1 Akuntansi',
-  faculty: 'Fakultas Ekonomi dan Bisnis',
-  description: 'Kelas perkuliahan Program Studi S1 Akuntansi Kelas 01SAKP014.',
-  monthly_dues_amount: 20000,
-  created_at: '2026-09-01T08:00:00Z',
-  updated_at: '2026-09-06T08:00:00Z',
-};
+const INITIAL_CLASS_INFO: ClassInfo = DEFAULT_CLASS_01SAKP014;
 
 const ALL_PERMISSIONS: PermissionCode[] = [
   'view_dashboard', 'view_members', 'create_members', 'edit_members', 'delete_members', 'assign_role',
@@ -80,6 +69,34 @@ const INITIAL_ROLES: Role[] = [
     updated_at: '2026-09-01T00:00:00Z',
   },
   {
+    id: 'role_wakil',
+    name: 'Wakil Ketua Kelas',
+    description: 'Membantu kepemimpinan kelas, koordinasi absensi, dan monitoring kegiatan',
+    is_system: true,
+    permissions: ALL_PERMISSIONS.filter(p => !p.startsWith('manage_roles') && !p.startsWith('delete_')),
+    created_at: '2026-09-01T00:00:00Z',
+    updated_at: '2026-09-01T00:00:00Z',
+  },
+  {
+    id: 'role_sekretaris',
+    name: 'Sekretaris',
+    description: 'Pencatatan notulensi rapat, absensi, persuratan, dan agenda perkuliahan',
+    is_system: true,
+    permissions: [
+      'view_dashboard', 'view_members', 'create_members', 'edit_members',
+      'view_agenda', 'create_agenda', 'edit_agenda', 'delete_agenda',
+      'view_announcements', 'create_announcements', 'edit_announcements',
+      'view_meetings', 'create_meetings', 'edit_minutes',
+      'view_tasks', 'create_tasks', 'edit_tasks',
+      'view_documents', 'upload_documents',
+      'view_polls', 'create_polls', 'vote_polls',
+      'view_attendance', 'manage_attendance',
+      'view_reports', 'export_reports',
+    ] as PermissionCode[],
+    created_at: '2026-09-01T00:00:00Z',
+    updated_at: '2026-09-01T00:00:00Z',
+  },
+  {
     id: 'role_bendahara',
     name: 'Bendahara',
     description: 'Pengelolaan keuangan kas kelas, penagihan, konfirmasi pembayaran, dan neraca kas',
@@ -88,6 +105,19 @@ const INITIAL_ROLES: Role[] = [
       'view_dashboard', 'view_members', 'view_finance', 'create_transaction',
       'edit_transaction', 'create_bill', 'manage_payments', 'view_financial_report',
       'export_financial_report', 'view_transparency', 'view_announcements'
+    ] as PermissionCode[],
+    created_at: '2026-09-01T00:00:00Z',
+    updated_at: '2026-09-01T00:00:00Z',
+  },
+  {
+    id: 'role_koordinator_acara',
+    name: 'Koordinator Acara',
+    description: 'Koordinasi kegiatan kelas, pertemuan, dan perayaan bersama',
+    is_system: true,
+    permissions: [
+      'view_dashboard', 'view_members', 'view_agenda', 'create_agenda', 'edit_agenda',
+      'view_announcements', 'create_announcements', 'view_meetings', 'create_meetings',
+      'view_tasks', 'create_tasks', 'view_polls', 'vote_polls',
     ] as PermissionCode[],
     created_at: '2026-09-01T00:00:00Z',
     updated_at: '2026-09-01T00:00:00Z',
@@ -108,76 +138,8 @@ const INITIAL_ROLES: Role[] = [
   },
 ];
 
-const INITIAL_USERS: User[] = [
-  {
-    id: 'usr_super_01',
-    name: 'M. Rachman (Super Admin)',
-    nim: '2601001401',
-    email: 'mrachmanfm@gmail.com',
-    phone: '081234567890',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-    class_id: 'cls_01sakp014',
-    department: 'S1 Akuntansi',
-    cohort: '2026',
-    role_id: 'role_superadmin',
-    position: 'Super Admin',
-    is_active: true,
-    joined_at: '2026-09-01T08:00:00Z',
-    created_at: '2026-09-01T08:00:00Z',
-    updated_at: '2026-09-06T08:00:00Z',
-  },
-  {
-    id: 'usr_ketua_01',
-    name: 'Ahmad Fauzi',
-    nim: '2601001402',
-    email: 'ahmad.fauzi@student.univ.ac.id',
-    phone: '081234567891',
-    avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
-    class_id: 'cls_01sakp014',
-    department: 'S1 Akuntansi',
-    cohort: '2026',
-    role_id: 'role_ketua',
-    position: 'Ketua Kelas',
-    is_active: true,
-    joined_at: '2026-09-01T08:00:00Z',
-    created_at: '2026-09-01T08:00:00Z',
-    updated_at: '2026-09-06T08:00:00Z',
-  },
-  {
-    id: 'usr_bendahara_01',
-    name: 'Siti Rahmawati',
-    nim: '2601001403',
-    email: 'siti.rahma@student.univ.ac.id',
-    phone: '081234567892',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-    class_id: 'cls_01sakp014',
-    department: 'S1 Akuntansi',
-    cohort: '2026',
-    role_id: 'role_bendahara',
-    position: 'Bendahara',
-    is_active: true,
-    joined_at: '2026-09-01T08:00:00Z',
-    created_at: '2026-09-01T08:00:00Z',
-    updated_at: '2026-09-06T08:00:00Z',
-  },
-  {
-    id: 'usr_member_01',
-    name: 'Budi Santoso',
-    nim: '2601001404',
-    email: 'budi.santoso@student.univ.ac.id',
-    phone: '081234567893',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-    class_id: 'cls_01sakp014',
-    department: 'S1 Akuntansi',
-    cohort: '2026',
-    role_id: 'role_anggota',
-    position: 'Anggota Kelas',
-    is_active: true,
-    joined_at: '2026-09-01T08:00:00Z',
-    created_at: '2026-09-01T08:00:00Z',
-    updated_at: '2026-09-06T08:00:00Z',
-  },
-];
+const INITIAL_USERS: User[] = TEMPLATE_39_STUDENTS;
+
 
 const INITIAL_COURSES: Course[] = [
   { id: 'crs_01', code: 'AKT101', name: 'Pengantar Akuntansi 1', sks: 3, lecturer_name: 'Dr. Hendra Wijaya, M.Ak., Ak., CA', lecturer_phone: '081122334455', schedule_day: 'Senin', schedule_time: '08:00 - 10:30', room: 'R. 402 Gedung FEB', color: '#2563eb' },
