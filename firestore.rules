@@ -1,9 +1,16 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default deny
+    // Default deny for unmatched documents
     match /{document=**} {
       allow read, write: if false;
+    }
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
     function isSignedIn() {
@@ -15,7 +22,7 @@ service cloud.firestore {
     }
 
     function isOwner(userId) {
-      return isSignedIn() && (request.auth.uid == userId || request.auth.token.email == userId);
+      return isAuthenticated() && (request.auth.uid == userId || request.auth.token.email == userId);
     }
 
     // Connection test document
@@ -24,13 +31,80 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Users collection
+    // ===============================================================
+    // Users Collection (Shared between Apps)
+    // ===============================================================
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && (isOwner(userId) || isSuperAdmin());
-      allow delete: if isSuperAdmin();
+      // Allow reading profiles for authenticated users / friends / leaderboard
+      allow read: if isAuthenticated();
+      // Owner or Super Admin can create and update profile
+      allow write: if isOwner(userId) || isSuperAdmin();
+
+      // Subcollection: sessions (App 2)
+      match /sessions/{sessionId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Subcollection: history (App 2)
+      match /history/{historyId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Subcollection: friend_requests (App 2)
+      match /friend_requests/{senderId} {
+        // Owner can read their incoming requests
+        allow read: if isOwner(userId);
+        // Anyone authenticated can send a friend request
+        allow write: if isAuthenticated();
+      }
+
+      // Subcollection: friends (App 2)
+      match /friends/{friendId} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
+    // ===============================================================
+    // Learning & Quiz App Collections (App 2)
+    // ===============================================================
+    match /benchmark_scores/{scoreId} {
+      // Anyone can read the benchmark leaderboard
+      allow read: if true;
+      // Authenticated users can submit their scores
+      allow write: if isAuthenticated();
+    }
+
+    match /global_leaderboard/{scoreId} {
+      // Anyone can read the global leaderboard
+      allow read: if true;
+      // Authenticated users can submit their scores
+      allow write: if isAuthenticated();
+    }
+
+    match /test_packages/{packageId} {
+      // Anyone can read test packages
+      allow read: if true;
+      // Allow anyone to write test packages (guest access support)
+      allow write: if true;
+    }
+
+    match /bank_soal/{questionId} {
+      allow read, write: if true;
+    }
+
+    match /article_questions/{questionId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /battles/{battleId} {
+      // Authenticated users can read and write battle rooms
+      allow read, write: if isAuthenticated();
+    }
+
+    // ===============================================================
+    // Classify Pro Collections (Class Management App)
+    // ===============================================================
     // Role Claim Requests (Google Auth Claim Flow)
     match /roleClaimRequests/{claimId} {
       allow read: if isSignedIn() && (request.auth.token.email == resource.data.google_email || isSuperAdmin());

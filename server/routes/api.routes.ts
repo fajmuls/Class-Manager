@@ -1006,32 +1006,74 @@ apiRouter.delete('/finance/kas-columns/:id', (req: AuthenticatedRequest, res: Re
 
 // --- DYNAMIC SEMESTER & COURSES SETTINGS ---
 apiRouter.get('/settings/semesters', (_req: AuthenticatedRequest, res: Response) => {
-  res.json({
-    semesters: db.semesters,
-    current_semester: db.classInfo.semester,
-    academic_year: db.classInfo.academic_year,
+  const currentSemester = String(db.classInfo.semester || 'Semester 1 (Ganjil)');
+  const academicYear = String(db.classInfo.academic_year || '2026/2027');
+
+  const formattedSemesters = db.semesters.map((sem, idx) => {
+    const isActive =
+      sem === currentSemester ||
+      (typeof db.classInfo.semester === 'number' && sem.startsWith(`Semester ${db.classInfo.semester}`));
+    return {
+      id: `sem_${idx + 1}`,
+      name: sem,
+      academic_year: academicYear,
+      is_active: isActive,
+    };
   });
+
+  res.json(formattedSemesters);
 });
 
 apiRouter.post('/settings/semesters', (req: AuthenticatedRequest, res: Response) => {
-  const { name } = req.body;
+  const { name, academic_year } = req.body;
   if (name && !db.semesters.includes(name)) {
     db.semesters.push(name);
   }
-  res.json({ semesters: db.semesters });
+  if (academic_year) {
+    db.classInfo.academic_year = academic_year;
+  }
+
+  const currentSemester = String(db.classInfo.semester || 'Semester 1 (Ganjil)');
+  const currentAcademicYear = String(db.classInfo.academic_year || '2026/2027');
+
+  const formattedSemesters = db.semesters.map((sem, idx) => ({
+    id: `sem_${idx + 1}`,
+    name: sem,
+    academic_year: currentAcademicYear,
+    is_active: sem === currentSemester,
+  }));
+
+  res.json(formattedSemesters);
 });
 
-apiRouter.put('/settings/active-semester', (req: AuthenticatedRequest, res: Response) => {
-  const { semester, academic_year } = req.body;
-  if (semester) db.classInfo.semester = semester;
-  if (academic_year) db.classInfo.academic_year = academic_year;
+const handleActiveSemester = (req: AuthenticatedRequest, res: Response) => {
+  const { semesterId, semester, academic_year } = req.body;
+  let targetSemester = semester;
+  if (!targetSemester && semesterId) {
+    if (String(semesterId).startsWith('sem_')) {
+      const idx = parseInt(String(semesterId).replace('sem_', ''), 10) - 1;
+      targetSemester = db.semesters[idx] || semesterId;
+    } else {
+      targetSemester = semesterId;
+    }
+  }
+
+  if (targetSemester) {
+    db.classInfo.semester = targetSemester;
+  }
+  if (academic_year) {
+    db.classInfo.academic_year = academic_year;
+  }
   db.classInfo.updated_at = new Date().toISOString();
 
   res.json({
     success: true,
     classInfo: db.classInfo,
   });
-});
+};
+
+apiRouter.post('/settings/active-semester', handleActiveSemester);
+apiRouter.put('/settings/active-semester', handleActiveSemester);
 
 // --- AGENDA & CALENDAR ---
 apiRouter.get('/agenda', requirePermission('view_agenda'), (_req, res: Response) => {

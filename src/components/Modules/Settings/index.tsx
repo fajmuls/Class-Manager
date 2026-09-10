@@ -48,10 +48,30 @@ export const SettingsModule: React.FC = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // App version according to user instruction
-  const APP_VERSION = 'v2.7.0';
-  const BUILD_DATE = '9 September 2026 (Skeleton UI, Session Persistence & Firestore Diagnostics)';
+  const APP_VERSION = 'v2.7.2';
+  const BUILD_DATE = '9 September 2026 (Unified Multi-App Firestore Rules Integration)';
 
   const PATCH_NOTES = [
+    {
+      version: 'v2.7.2',
+      date: '9 September 2026',
+      type: 'Database Security & Multi-App Sync',
+      notes: [
+        'Firestore Rules: Integrasi aturan keamanan terpadu untuk 2 aplikasi dalam 1 project Firebase (Users, Sessions, Friend Requests, Benchmark Scores, Global Leaderboard, Test Packages, Bank Soal, Article Questions, Battles).',
+        'Live Deployment: Aturan firestore.rules langsung dideploy dan disinkronkan ke server Cloud Firestore.',
+        'Data Isolation: Pengamanan subkoleksi akun dan data belajar antar-aplikasi tanpa merusak akses Classify Pro.',
+      ]
+    },
+    {
+      version: 'v2.7.1',
+      date: '9 September 2026',
+      type: 'Bug Fix & Data Normalization',
+      notes: [
+        'Bug Fix: Mengatasi Uncaught TypeError: semesters.map is not a function dengan normalisasi response API dan defensive rendering.',
+        'API Fix: Menambahkan dukungan multi-method (POST & PUT) pada rute pengaturan semester aktif backend.',
+        'Data Resiliency: Fallback otomatis untuk mendeteksi data semester dalam bentuk array maupun nested object.',
+      ]
+    },
     {
       version: 'v2.7.0',
       date: '9 September 2026',
@@ -174,10 +194,54 @@ export const SettingsModule: React.FC = () => {
 
   const loadSemesters = async () => {
     try {
-      const list = await api.getSemesters();
-      setSemesters(list);
+      const res = await api.getSemesters();
+      if (Array.isArray(res)) {
+        // Res is already an array
+        const normalized = res.map((item: any, idx: number) => {
+          if (typeof item === 'object' && item !== null) {
+            return {
+              id: item.id || `sem_${idx + 1}`,
+              name: item.name || String(item),
+              academic_year: item.academic_year || classInfo?.academic_year || '2026/2027',
+              is_active: Boolean(item.is_active),
+            };
+          }
+          return {
+            id: `sem_${idx + 1}`,
+            name: String(item),
+            academic_year: classInfo?.academic_year || '2026/2027',
+            is_active: String(item) === String(classInfo?.semester),
+          };
+        });
+        setSemesters(normalized);
+      } else if (res && typeof res === 'object' && Array.isArray((res as any).semesters)) {
+        // Res is { semesters: [...], current_semester: ..., academic_year: ... }
+        const rawList = (res as any).semesters;
+        const currentSem = (res as any).current_semester || classInfo?.semester || '';
+        const acYear = (res as any).academic_year || classInfo?.academic_year || '2026/2027';
+        const normalized = rawList.map((item: any, idx: number) => {
+          if (typeof item === 'object' && item !== null) {
+            return {
+              id: item.id || `sem_${idx + 1}`,
+              name: item.name || String(item),
+              academic_year: item.academic_year || acYear,
+              is_active: Boolean(item.is_active) || item.name === currentSem,
+            };
+          }
+          return {
+            id: `sem_${idx + 1}`,
+            name: String(item),
+            academic_year: acYear,
+            is_active: String(item) === String(currentSem),
+          };
+        });
+        setSemesters(normalized);
+      } else {
+        setSemesters([]);
+      }
     } catch (err) {
       console.error('Error loading semesters:', err);
+      setSemesters([]);
     }
   };
 
@@ -779,38 +843,44 @@ export const SettingsModule: React.FC = () => {
 
         {/* Semesters list */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-          {semesters.map((sem) => (
-            <div
-              key={sem.id}
-              className={`p-4 rounded-xl border flex flex-col justify-between transition-all ${
-                sem.is_active
-                  ? 'border-blue-500 bg-blue-50/50 shadow-xs'
-                  : 'border-slate-200 bg-white hover:border-slate-300'
-              }`}
-            >
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-900 text-xs">{sem.name}</span>
-                  {sem.is_active && (
-                    <span className="px-2 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-bold">
-                      Aktif Sekarang
-                    </span>
-                  )}
+          {Array.isArray(semesters) && semesters.length > 0 ? (
+            semesters.map((sem) => (
+              <div
+                key={sem.id || sem.name}
+                className={`p-4 rounded-xl border flex flex-col justify-between transition-all ${
+                  sem.is_active
+                    ? 'border-blue-500 bg-blue-50/50 shadow-xs'
+                    : 'border-slate-200 bg-white hover:border-slate-300'
+                }`}
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 text-xs">{sem.name}</span>
+                    {sem.is_active && (
+                      <span className="px-2 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-bold">
+                        Aktif Sekarang
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500">Tahun: {sem.academic_year}</p>
                 </div>
-                <p className="text-[11px] text-slate-500">Tahun: {sem.academic_year}</p>
-              </div>
 
-              {!sem.is_active && (
-                <button
-                  type="button"
-                  onClick={() => handleSetActiveSemester(sem.id)}
-                  className="mt-3 w-full py-1.5 px-3 bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
-                >
-                  Jadikan Semester Aktif
-                </button>
-              )}
+                {!sem.is_active && (
+                  <button
+                    type="button"
+                    onClick={() => handleSetActiveSemester(sem.id || sem.name)}
+                    className="mt-3 w-full py-1.5 px-3 bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-700 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                  >
+                    Jadikan Semester Aktif
+                  </button>
+                )}
+              </div>
+            ))
+          ) : (
+            <div className="col-span-full py-4 text-center text-xs text-slate-400">
+              Belum ada data semester atau sedang dimuat...
             </div>
-          ))}
+          )}
         </div>
 
         {/* Add semester form */}
