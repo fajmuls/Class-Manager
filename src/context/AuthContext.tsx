@@ -7,6 +7,8 @@ import {
   signOutFirebase,
   getAccessToken,
   setAccessToken,
+  refreshFirebaseSession,
+  onIdTokenChanged,
 } from '../services/firebase.ts';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { UnauthorizedDomainModal } from '../components/Auth/UnauthorizedDomainModal.tsx';
@@ -41,12 +43,44 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<Role | null>(null);
-  const [permissions, setPermissions] = useState<PermissionCode[]>([]);
-  const [classInfo, setClassInfo] = useState<ClassInfo | null>(null);
+  // Hydrate initial user state from localStorage cache for instant zero-jump loading
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const raw = localStorage.getItem('cms_cached_user');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [role, setRole] = useState<Role | null>(() => {
+    try {
+      const raw = localStorage.getItem('cms_cached_role');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [permissions, setPermissions] = useState<PermissionCode[]>(() => {
+    try {
+      const raw = localStorage.getItem('cms_cached_role');
+      return raw ? JSON.parse(raw).permissions || [] : [];
+    } catch {
+      return [];
+    }
+  });
+  const [classInfo, setClassInfo] = useState<ClassInfo | null>(() => {
+    try {
+      const raw = localStorage.getItem('cms_cached_classinfo');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
   const [allUsers, setAllUsers] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // If cache exists, app can render immediately while revalidating
+  const [isLoading, setIsLoading] = useState(() => {
+    return !localStorage.getItem('cms_cached_user');
+  });
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [googleAccessToken, setGoogleAccessTokenState] = useState<string | null>(getAccessToken());
   const [showDomainModal, setShowDomainModal] = useState(false);
@@ -59,9 +93,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isPendingApproval: false,
   });
 
+  const syncCache = (u: User | null, r: Role | null, c: ClassInfo | null) => {
+    try {
+      if (u) localStorage.setItem('cms_cached_user', JSON.stringify(u));
+      else localStorage.removeItem('cms_cached_user');
+      if (r) localStorage.setItem('cms_cached_role', JSON.stringify(r));
+      else localStorage.removeItem('cms_cached_role');
+      if (c) localStorage.setItem('cms_cached_classinfo', JSON.stringify(c));
+      else localStorage.removeItem('cms_cached_classinfo');
+    } catch {}
+  };
+
   const loadInitialData = async (activeEmail?: string) => {
     try {
-      // Don't set isLoading(true) here if it's already loading from effect
       const [meData, usersList] = await Promise.all([
         api.getMe(),
         api.getAllUsers(),
@@ -72,10 +116,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setPermissions(meData.permissions as PermissionCode[]);
       setClassInfo(meData.classInfo);
       setAllUsers(usersList);
+      syncCache(meData.user, meData.role, meData.classInfo);
     } catch (err) {
       console.error('Failed to load user or class data:', err);
     }
   };
+
+  // Background Silent Refresh Listener & Loop
+  useEffect(() => {
+    // 1. Listen for token lifecycle changes silently
+    const tokenUnsub = onIdTokenChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        setFirebaseUser(fbUser);
+        const token = await fbUser.getIdToken();
+        if (token) {
+          // Token is fresh and auto-rotated by Firebase client SDK
+        }
+      }
+    });
+
+    // 2. Silent refresh timer: every 30 minutes to prevent token expiration
+    const refreshInterval = setInterval(async () => {
+      if (auth.currentUser) {
+        await refreshFirebaseSession(false);
+      }
+    }, 30 * 60 * 1000);
+
+    // 3. Tab visibility recovery: refresh when user returns to active tab
+    const handleVisibility = async () => {
+      if (document.visibilityState === 'visible' && auth.currentUser) {
+        await refreshFirebaseSession(false);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      tokenUnsub();
+      clearInterval(refreshInterval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -116,6 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setRole(res.role);
             setPermissions(res.permissions as PermissionCode[]);
             setClassInfo(res.classInfo);
+            syncCache(res.user, res.role, res.classInfo);
           }
           
           // Pre-load users list
@@ -172,6 +253,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setRole(syncRes.role);
           setPermissions(syncRes.permissions as PermissionCode[]);
           setClassInfo(syncRes.classInfo);
+          syncCache(syncRes.user, syncRes.role, syncRes.classInfo);
         }
         const usersList = await api.getAllUsers();
         setAllUsers(usersList);
@@ -224,6 +306,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setRole(syncRes.role);
         setPermissions(syncRes.permissions as PermissionCode[]);
         setClassInfo(syncRes.classInfo);
+        syncCache(syncRes.user, syncRes.role, syncRes.classInfo);
       }
       const usersList = await api.getAllUsers();
       setAllUsers(usersList);

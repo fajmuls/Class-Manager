@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/AuthContext.tsx';
 import { api } from '../../../services/api.ts';
+import { testFirestoreConnection, FirestoreConnectionResult } from '../../../services/firebase.ts';
 import { RoleClaimApprovalPanel } from '../../Admin/RoleClaimApprovalPanel.tsx';
 import {
   Settings,
@@ -26,6 +27,9 @@ import {
   CalendarCheck,
   History,
   X,
+  Database,
+  RefreshCw,
+  ExternalLink,
 } from 'lucide-react';
 
 export const SettingsModule: React.FC = () => {
@@ -44,10 +48,21 @@ export const SettingsModule: React.FC = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // App version according to user instruction
-  const APP_VERSION = 'v2.6.4';
-  const BUILD_DATE = '6 September 2026 (Auth Stability & Performance)';
+  const APP_VERSION = 'v2.7.0';
+  const BUILD_DATE = '9 September 2026 (Skeleton UI, Session Persistence & Firestore Diagnostics)';
 
   const PATCH_NOTES = [
+    {
+      version: 'v2.7.0',
+      date: '9 September 2026',
+      type: 'Major QoL & UI Update',
+      notes: [
+        'UI/UX: Implementasi Dashboard Skeleton Screen dengan shimmering pulse realistis menggantikan spinner loading tradisional.',
+        'QoL: Mekanisme Silent-Refresh Token Firebase & Session Persistence (localStorage caching) untuk mencegah logout mendadak saat sesi lama.',
+        'Database: Integrasi Diagnostik Koneksi Cloud Firestore dan checklist panduan aktivasi Firebase Console interaktif.',
+        'Architecture: Persiapan modularisasi backend API router guna mempercepat cold-start server.',
+      ]
+    },
     {
       version: 'v2.6.4',
       date: '6 September 2026',
@@ -128,9 +143,33 @@ export const SettingsModule: React.FC = () => {
     return localStorage.getItem('cms_show_role_switcher') === 'true';
   });
 
+  // Cloud Firestore Diagnostics
+  const [firestoreStatus, setFirestoreStatus] = useState<FirestoreConnectionResult | null>(null);
+  const [isTestingFirestore, setIsTestingFirestore] = useState(false);
+
+  const handleTestFirestore = async () => {
+    setIsTestingFirestore(true);
+    try {
+      const res = await testFirestoreConnection();
+      setFirestoreStatus(res);
+    } catch (err: any) {
+      setFirestoreStatus({
+        connected: false,
+        status: 'error',
+        message: err?.message || 'Gagal menguji koneksi',
+        projectId: 'fajmuls-learning',
+        databaseId: '(default)',
+        timestamp: new Date().toISOString(),
+      });
+    } finally {
+      setIsTestingFirestore(false);
+    }
+  };
+
   useEffect(() => {
     loadWebhookSettings();
     loadSemesters();
+    handleTestFirestore();
   }, []);
 
   const loadSemesters = async () => {
@@ -289,6 +328,153 @@ export const SettingsModule: React.FC = () => {
           <span className="inline-flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-950/60 px-3 py-1.5 rounded-lg border border-emerald-800 font-semibold">
             <CheckCircle2 className="w-4 h-4" /> Sistem Up-to-Date
           </span>
+        </div>
+      </div>
+
+      {/* Cloud Firestore Connectivity & Diagnostics Guide Card */}
+      <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+              <Database className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900">
+                  Status Koneksi Cloud Firestore & Panduan Firebase Web
+                </h3>
+                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-mono font-semibold">
+                  fajmuls-learning
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Pemantauan status konektivitas database Cloud Firestore dan petunjuk konfigurasi di Firebase Console.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {isTestingFirestore ? (
+              <span className="inline-flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-200 font-semibold">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Menguji Koneksi...
+              </span>
+            ) : firestoreStatus?.status === 'connected' ? (
+              <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 font-semibold">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Terhubung Langsung
+              </span>
+            ) : firestoreStatus?.status === 'permission_denied' ? (
+              <span className="inline-flex items-center gap-1.5 text-xs text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-200 font-semibold">
+                <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" /> Database Aktif (Rules Berjalan)
+              </span>
+            ) : firestoreStatus?.status === 'not_found' ? (
+              <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 font-semibold">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-600" /> Database Belum Dibuat
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-xs text-slate-700 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 font-semibold">
+                <AlertCircle className="w-3.5 h-3.5 text-slate-500" /> Mode Standby
+              </span>
+            )}
+
+            <button
+              type="button"
+              onClick={handleTestFirestore}
+              disabled={isTestingFirestore}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isTestingFirestore ? 'animate-spin' : ''}`} />
+              <span>Uji Ulang</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Live Diagnostics Message */}
+        {firestoreStatus && (
+          <div
+            className={`p-4 rounded-xl text-xs flex items-start gap-3 border ${
+              firestoreStatus.status === 'connected' || firestoreStatus.status === 'permission_denied'
+                ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+                : firestoreStatus.status === 'not_found'
+                ? 'bg-amber-50/70 border-amber-200 text-amber-900'
+                : 'bg-slate-50 border-slate-200 text-slate-800'
+            }`}
+          >
+            <Info className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-semibold">{firestoreStatus.message}</p>
+              {firestoreStatus.details && (
+                <p className="text-[11px] font-mono opacity-80 break-all">{firestoreStatus.details}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Step-by-Step Instructions for Firebase Web Console */}
+        <div className="bg-slate-50/80 rounded-xl p-4 border border-slate-200/80 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+              <span>Langkah yang Harus Dilakukan di Firebase Web Console:</span>
+            </h4>
+            <a
+              href="https://console.firebase.google.com/project/fajmuls-learning/firestore"
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 underline underline-offset-2"
+            >
+              <span>Buka Firebase Console</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <div className="p-3 bg-white rounded-lg border border-slate-200 space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[10px]">
+                  1
+                </span>
+                <span className="font-bold text-slate-800">Buat Database Cloud Firestore</span>
+              </div>
+              <p className="text-slate-600 text-[11px] leading-relaxed">
+                Di menu <strong>Build &gt; Firestore Database</strong>, klik tombol <strong>"Create Database"</strong> jika database belum ada. Pilih Database ID: <code>(default)</code> dan Region yang terdekat (contoh: <code>asia-southeast2</code> Jakarta atau <code>asia-southeast1</code> Singapura).
+              </p>
+            </div>
+
+            <div className="p-3 bg-white rounded-lg border border-slate-200 space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[10px]">
+                  2
+                </span>
+                <span className="font-bold text-slate-800">Publish Security Rules</span>
+              </div>
+              <p className="text-slate-600 text-[11px] leading-relaxed">
+                Buka tab <strong>Rules</strong> di Firestore Database. Pastikan aturan keamanan mengizinkan user terautentikasi (aturan lengkap telah kami buatkan di file <code>firestore.rules</code> pada proyek ini).
+              </p>
+            </div>
+
+            <div className="p-3 bg-white rounded-lg border border-slate-200 space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[10px]">
+                  3
+                </span>
+                <span className="font-bold text-slate-800">Otorisasi Domain Web (Auth)</span>
+              </div>
+              <p className="text-slate-600 text-[11px] leading-relaxed">
+                Di menu <strong>Authentication &gt; Settings &gt; Authorized Domains</strong>, pastikan domain host Cloud Run (<code>ais-dev-t6ocsfpygutqt3ojgdzst4-10827594519.asia-southeast1.run.app</code>) telah ditambahkan ke daftar izin.
+              </p>
+            </div>
+
+            <div className="p-3 bg-white rounded-lg border border-slate-200 space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[10px]">
+                  4
+                </span>
+                <span className="font-bold text-slate-800">Uji Ulang Koneksi</span>
+              </div>
+              <p className="text-slate-600 text-[11px] leading-relaxed">
+                Setelah database Firestore dibuat dan Rules di-publish, klik tombol <strong>"Uji Ulang"</strong> di atas. Status akan berubah menjadi hijau menandakan koneksi realtime siap digunakan.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 

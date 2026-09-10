@@ -22,6 +22,7 @@ import { SettingsModule } from './components/Modules/Settings/index.tsx';
 import { CoursesModule } from './components/Modules/Courses/index.tsx';
 import { GlobalSearchModal } from './components/UI/GlobalSearchModal.tsx';
 import { GoogleRoleClaimModal } from './components/Auth/GoogleRoleClaimModal.tsx';
+import { DashboardSkeleton } from './components/UI/DashboardSkeleton.tsx';
 
 const AppContent: React.FC = () => {
   const { user, role, isLoading, claimStatus } = useAuth();
@@ -63,13 +64,7 @@ const AppContent: React.FC = () => {
   }, []);
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-4">
-        <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="text-sm font-semibold text-slate-700">Memuat Classify Pro...</p>
-        <p className="text-xs text-slate-400 mt-1">Menginisialisasi otentikasi RBAC & database</p>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
