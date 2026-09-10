@@ -24,6 +24,7 @@ import { CoursesModule } from './components/Modules/Courses/index.tsx';
 import { GlobalSearchModal } from './components/UI/GlobalSearchModal.tsx';
 import { GoogleRoleClaimModal } from './components/Auth/GoogleRoleClaimModal.tsx';
 import { DashboardSkeleton } from './components/UI/DashboardSkeleton.tsx';
+import { PendingRoleApprovalBanner } from './components/Layout/PendingRoleApprovalBanner.tsx';
 
 const AppContent: React.FC = () => {
   const { user, role, isLoading, hasEnteredPortal, enterPortal, loginWithGoogle, claimStatus } = useAuth();
@@ -77,7 +78,7 @@ const AppContent: React.FC = () => {
           onLoginGoogle={loginWithGoogle}
         />
         <GoogleRoleClaimModal
-          isOpen={claimStatus.requiresClaim || claimStatus.isPendingApproval}
+          isOpen={claimStatus.requiresClaim}
         />
       </>
     );
@@ -113,6 +114,9 @@ const AppContent: React.FC = () => {
 
         {/* Content Area */}
         <main className="flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+          {/* Pending Role Approval Notice */}
+          <PendingRoleApprovalBanner />
+
           {currentModule === 'dashboard' && (
             <DashboardHub onNavigate={(mod) => setCurrentModule(mod)} />
           )}

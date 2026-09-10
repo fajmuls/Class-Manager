@@ -15,6 +15,9 @@ import {
   Search,
   KeyRound,
   GraduationCap,
+  Building2,
+  ArrowRight,
+  Check,
 } from 'lucide-react';
 import { TEMPLATE_39_STUDENTS } from '../../services/firestoreSync.ts';
 
@@ -23,6 +26,12 @@ interface GoogleRoleClaimModalProps {
   onClose?: () => void;
 }
 
+const AVAILABLE_CLASSES = [
+  { id: 'cls_01sakp014', name: 'Kelas 01 SAKP 14', code: '01SAKP014', major: 'S1 Akuntansi Perpajakan' },
+  { id: 'cls_02sakp001', name: 'Kelas 02 SAKP 01', code: '02SAKP001', major: 'S1 Akuntansi Keuangan' },
+  { id: 'cls_03mnj005', name: 'Kelas 03 MNJ 05', code: '03MNJ005', major: 'S1 Manajemen Bisnis' },
+];
+
 export const GoogleRoleClaimModal: React.FC<GoogleRoleClaimModalProps> = ({
   isOpen,
 }) => {
@@ -30,21 +39,21 @@ export const GoogleRoleClaimModal: React.FC<GoogleRoleClaimModalProps> = ({
     firebaseUser,
     logoutGoogle,
     refreshAuth,
+    enterPortal,
     allUsers,
   } = useAuth();
 
   const [students, setStudents] = useState<User[]>(TEMPLATE_39_STUDENTS);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState('cls_01sakp014');
   const [nimInput, setNimInput] = useState('');
   const [selectedStudentId, setSelectedStudentId] = useState('');
-  const [selectedRoleId, setSelectedRoleId] = useState('role_anggota');
+  const [selectedRoleId, setSelectedRoleId] = useState('role_sekretaris');
   const [proCodeInput, setProCodeInput] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isChecking, setIsChecking] = useState(false);
-  const [isPending, setIsPending] = useState(false);
-  const [submittedClaim, setSubmittedClaim] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
   // Load students & roles
   useEffect(() => {
@@ -90,40 +99,6 @@ export const GoogleRoleClaimModal: React.FC<GoogleRoleClaimModalProps> = ({
     }
   };
 
-  // Check current claim status on open or mount
-  useEffect(() => {
-    if (firebaseUser?.email) {
-      checkStatus();
-    }
-  }, [firebaseUser?.email]);
-
-  const checkStatus = async () => {
-    if (!firebaseUser?.email) return;
-    try {
-      setIsChecking(true);
-      const res = await api.googleLogin({
-        email: firebaseUser.email,
-        displayName: firebaseUser.displayName,
-        photoURL: firebaseUser.photoURL,
-        uid: firebaseUser.uid,
-      });
-
-      if (res.isPendingApproval) {
-        setIsPending(true);
-        setSubmittedClaim(res.claimRequest);
-      } else if (res.isApproved && res.user) {
-        setIsPending(false);
-        await refreshAuth();
-      } else if (res.requiresClaim) {
-        setIsPending(false);
-      }
-    } catch (err) {
-      console.error('Error checking claim status:', err);
-    } finally {
-      setIsChecking(false);
-    }
-  };
-
   const handleSubmitClaim = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firebaseUser?.email || !selectedStudentId) return;
@@ -131,11 +106,13 @@ export const GoogleRoleClaimModal: React.FC<GoogleRoleClaimModalProps> = ({
     try {
       setIsSubmitting(true);
       const chosenStudent = students.find(s => s.id === selectedStudentId);
+      const chosenRole = roles.find(r => r.id === selectedRoleId);
       
       const payloadNotes = [
         notes.trim(),
-        proCodeInput.trim() ? `[KODE PRO / AKSES: ${proCodeInput.trim()}]` : '',
+        proCodeInput.trim() ? `[KODE PRO: ${proCodeInput.trim()}]` : '',
         nimInput.trim() ? `[NIM: ${nimInput.trim()}]` : '',
+        `[Kelas: ${selectedClassId}]`,
       ].filter(Boolean).join(' - ');
 
       const res = await api.claimRole({
@@ -150,17 +127,22 @@ export const GoogleRoleClaimModal: React.FC<GoogleRoleClaimModalProps> = ({
       });
 
       if (res.autoApproved) {
-        // Instant unlock!
-        await refreshAuth();
+        setSuccessNotice('Kode Master Terverifikasi! Membuka hak akses penuh...');
+        setTimeout(async () => {
+          await enterPortal(selectedStudentId);
+        }, 500);
         return;
       }
 
-      if (res.success) {
-        setIsPending(true);
-        setSubmittedClaim(res.claimRequest);
-      }
+      // Smooth entry as Anggota with pending role
+      setSuccessNotice(
+        `Registrasi Berhasil! Anda sekarang masuk sebagai Anggota Kelas. Pengajuan role ${chosenRole?.name || 'Sekretaris'} akan ditinjau oleh Super Admin.`
+      );
+      setTimeout(async () => {
+        await enterPortal(selectedStudentId);
+      }, 700);
     } catch (err: any) {
-      alert(err.message || 'Gagal mengirim permintaan klaim identitas');
+      alert(err.message || 'Gagal mengirim pendaftaran');
     } finally {
       setIsSubmitting(false);
     }
@@ -174,12 +156,12 @@ export const GoogleRoleClaimModal: React.FC<GoogleRoleClaimModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-5 sm:p-7 space-y-5 animate-in fade-in-50 zoom-in-95 border border-slate-100 my-8">
+    <div className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-5 sm:p-7 space-y-5 animate-in fade-in-50 zoom-in-95 border border-slate-100 my-6">
         {/* Header Badge */}
         <div className="flex items-center justify-between">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold border border-blue-200">
-            <GraduationCap className="w-3.5 h-3.5" /> Kelas 01 SAKP 14 • Registrasi Mahasiswa
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold border border-indigo-200">
+            <GraduationCap className="w-3.5 h-3.5" /> Pendaftaran & Pemilihan Kelas Mahasiswa
           </div>
           <button
             onClick={logoutGoogle}
@@ -209,112 +191,87 @@ export const GoogleRoleClaimModal: React.FC<GoogleRoleClaimModalProps> = ({
           </div>
         </div>
 
-        {isPending ? (
-          /* State: Menunggu Persetujuan Super Admin */
-          <div className="text-center space-y-4 py-2">
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto shadow-sm">
-              <Clock className="w-6 h-6 animate-spin" />
-            </div>
+        {/* Informative Guidance */}
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 leading-relaxed">
+          <p className="font-semibold flex items-center gap-1.5 text-blue-800 mb-1">
+            <Sparkles className="w-3.5 h-3.5 text-blue-600" /> Akses Cepat Langsung Masuk Portal
+          </p>
+          Silakan pilih kelas, masukkan NIM, dan pilih jabatan yang Anda ajukan. Setelah submit, Anda akan <strong>langsung masuk ke portal sebagai Anggota Kelas</strong> untuk melihat detail jadwal, kas, dan direktori, sementara pengajuan jabatan akan di-verifikasi oleh Super Admin.
+        </div>
 
-            <div className="space-y-1">
-              <h3 className="text-base font-bold text-slate-900">
-                Pengajuan Terkirim (Menunggu Persetujuan)
-              </h3>
-              <p className="text-xs text-slate-600 leading-relaxed max-w-sm mx-auto">
-                Permintaan Anda telah tersimpan di Firebase. Super Admin / Ketua Kelas (
-                <span className="font-semibold text-slate-800">
-                  mrachmanfm@gmail.com
-                </span>
-                ) akan menyetujui klaim NIM & role Anda.
-              </p>
+        {successNotice ? (
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-900 text-xs text-center space-y-2 animate-in fade-in-50">
+            <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+              <Check className="w-5 h-5 animate-bounce" />
             </div>
-
-            {submittedClaim && (
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-left space-y-1.5 font-medium">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Mahasiswa:</span>
-                  <span className="text-slate-900 font-bold">
-                    {submittedClaim.user_name}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">NIM:</span>
-                  <span className="text-slate-900 font-mono">
-                    {submittedClaim.user_nim}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Role Diminta:</span>
-                  <span className="text-blue-600 font-bold">
-                    {submittedClaim.role_name}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            <div className="pt-2 flex flex-col sm:flex-row items-center gap-2 justify-center">
-              <button
-                type="button"
-                onClick={checkStatus}
-                disabled={isChecking}
-                className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
-              >
-                <RefreshCw
-                  className={`w-3.5 h-3.5 ${isChecking ? 'animate-spin' : ''}`}
-                />
-                <span>{isChecking ? 'Memeriksa...' : 'Cek Status Persetujuan'}</span>
-              </button>
-            </div>
+            <p className="font-bold text-emerald-800">{successNotice}</p>
+            <p className="text-[11px] text-emerald-700">Membuka menu utama kelas Anda...</p>
           </div>
         ) : (
-          /* State: Form Input NIM & Pilih Siapa Akun Ini */
           <form onSubmit={handleSubmitClaim} className="space-y-4 text-xs">
+            {/* Step 1: Select Class */}
             <div>
-              <label className="block font-semibold text-slate-800 mb-1">
-                Langkah 1: Masukkan NIM Anda
+              <label className="block font-semibold text-slate-800 mb-1 flex items-center gap-1">
+                <Building2 className="w-3.5 h-3.5 text-indigo-600" /> Langkah 1: Pilih Kelas Perkuliahan
               </label>
-              <div className="relative">
+              <select
+                value={selectedClassId}
+                onChange={(e) => setSelectedClassId(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-indigo-500 text-slate-800 font-medium"
+              >
+                {AVAILABLE_CLASSES.map((cls) => (
+                  <option key={cls.id} value={cls.id}>
+                    {cls.name} ({cls.code}) — {cls.major}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Step 2: Input NIM & Select Student */}
+            <div className="space-y-2">
+              <div>
+                <label className="block font-semibold text-slate-800 mb-1">
+                  Langkah 2: Masukkan NIM Anda
+                </label>
                 <input
                   type="text"
                   required
                   placeholder="Ketik NIM Anda (contoh: 261011201412)"
                   value={nimInput}
                   onChange={(e) => handleNimChange(e.target.value)}
-                  className="w-full pl-3.5 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-blue-500 text-slate-800 font-mono text-sm"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-indigo-500 text-slate-800 font-mono text-sm font-semibold"
                 />
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">
-                Sistem akan otomatis mencocokkan dengan data 39 mahasiswa kelas 01 SAKP 14.
-              </p>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1 text-[11px]">
+                  Pilih Nama di Roster 39 Mahasiswa Kelas:
+                </label>
+                <select
+                  required
+                  value={selectedStudentId}
+                  onChange={(e) => handleStudentSelect(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-indigo-500 text-slate-800 text-xs"
+                >
+                  {filteredList.map((s, idx) => (
+                    <option key={s.id} value={s.id}>
+                      {idx + 1}. {s.name} (NIM: {s.nim})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label className="block font-semibold text-slate-800 mb-1">
-                Langkah 2: Pilih Nama Mahasiswa di Roster
-              </label>
-              <select
-                required
-                value={selectedStudentId}
-                onChange={(e) => handleStudentSelect(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-blue-500 text-slate-800 font-medium"
-              >
-                {filteredList.map((s, idx) => (
-                  <option key={s.id} value={s.id}>
-                    {idx + 1}. {s.name} — NIM: {s.nim}
-                  </option>
-                ))}
-              </select>
-            </div>
-
+            {/* Step 3: Requested Role & Optional Pro Code */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block font-semibold text-slate-800 mb-1">
-                  Langkah 3: Ajukan Role / Jabatan
+                  Langkah 3: Ajukan Jabatan / Role
                 </label>
                 <select
                   value={selectedRoleId}
                   onChange={(e) => setSelectedRoleId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-blue-500 text-slate-800 font-medium"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-indigo-500 text-slate-800 font-medium"
                 >
                   {roles
                     .filter((r) => r.id !== 'role_superadmin')
@@ -324,12 +281,15 @@ export const GoogleRoleClaimModal: React.FC<GoogleRoleClaimModalProps> = ({
                       </option>
                     ))}
                 </select>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Masuk awal sebagai Anggota, di-ACC Super Admin untuk role pengurus.
+                </p>
               </div>
 
               <div>
                 <label className="block font-semibold text-slate-800 mb-1 flex items-center justify-between">
                   <span className="flex items-center gap-1">
-                    <KeyRound className="w-3.5 h-3.5 text-amber-600" /> Kode Pro / Akses
+                    <KeyRound className="w-3.5 h-3.5 text-amber-600" /> Kode Pro (Opsional)
                   </span>
                   <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded">
                     01SAKP014PRO
@@ -337,27 +297,29 @@ export const GoogleRoleClaimModal: React.FC<GoogleRoleClaimModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  placeholder="Ketik 01SAKP014PRO untuk Auto-Approval..."
+                  placeholder="Ketik 01SAKP014PRO..."
                   value={proCodeInput}
                   onChange={(e) => setProCodeInput(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-blue-500 text-slate-800 font-mono"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-indigo-500 text-slate-800 font-mono"
                 />
               </div>
             </div>
 
+            {/* Step 4: Notes */}
             <div>
               <label className="block font-semibold text-slate-800 mb-1">
-                Catatan / Keterangan Tambahan (Opsional)
+                Catatan / Informasi Tambahan (Opsional)
               </label>
               <textarea
                 rows={2}
-                placeholder="Tuliskan keterangan pengurus atau informasi untuk Ketua Kelas..."
+                placeholder="Tuliskan catatan permohonan untuk Ketua Kelas / Super Admin..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-blue-500 text-slate-800"
+                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-indigo-500 text-slate-800 text-xs"
               />
             </div>
 
+            {/* Actions */}
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
               <button
                 type="button"
@@ -370,12 +332,19 @@ export const GoogleRoleClaimModal: React.FC<GoogleRoleClaimModalProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-md transition-colors cursor-pointer"
               >
-                <Send className="w-3.5 h-3.5" />
-                <span>
-                  {isSubmitting ? 'Mengirim...' : 'Kirim Pengajuan Klaim'}
-                </span>
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Memproses...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Daftar & Masuk Kelas</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </>
+                )}
               </button>
             </div>
           </form>

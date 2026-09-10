@@ -51,10 +51,35 @@ export const SettingsModule: React.FC = () => {
   const [isExportingBackup, setIsExportingBackup] = useState(false);
 
   // App version according to user instruction
-  const APP_VERSION = 'v3.1.0';
-  const BUILD_DATE = '10 September 2026 (WhatsApp Kas Reminders, Dynamic QR Presence, H-1 Push Notifications, GPA Simulator, Discussion Forum & Interactive Org Chart)';
+  const APP_VERSION = 'v3.3.0';
+  const BUILD_DATE = '10 September 2026 (Google Login First Flow, Restricted Class Editor to Super Admin, Zero-Friction Student Profile Selection & Clean Minimalist Online Status UI)';
 
   const PATCH_NOTES = [
+    {
+      version: 'v3.3.0',
+      date: '10 September 2026',
+      type: 'Google Login First Flow, Restricted Class Management & Clean Minimalist UI',
+      notes: [
+        'Alur Autentikasi Google di Awal: Pengguna melakukan login Google terlebih dahulu di layar awal sebelum diarahkan untuk memilih kelas perkuliahan.',
+        'Akses Pengelolaan Kelas Khusus Super Admin: Tombol Tambah, Edit, dan Hapus kelas di layar selamat datang hanya dapat diakses oleh Super Admin (mrachmanfm@gmail.com). Pengguna biasa tidak memiliki akses manipulasi kelas.',
+        'Masuk Kelas Cepat Tanpa Login Ulang: Setelah memilih kelas, mahasiswa tidak perlu login lagi—cukup memasukkan NIM / memilih profil dari 39 roster dan langsung masuk ke menu kelas.',
+        'Penyederhanaan Status Online: Mengubah teks indikator koneksi yang panjang menjadi indikator bersih "Online" (titik hijau berkedip).',
+        'Banner Approval Lebih Ramping: Format notifikasi persetujuan role yang lebih ringkas dan tidak memakan banyak ruang visual.',
+      ]
+    },
+    {
+      version: 'v3.2.0',
+      date: '10 September 2026',
+      type: 'Direct Google Login as Anggota, Onboarding Class & NIM Selector, Super Admin Class Editor on Splash',
+      notes: [
+        'Akses Langsung Masuk Portal: Setelah login Google dan memilih kelas serta NIM, mahasiswa langsung masuk ke menu portal sebagai Anggota Kelas dengan hak akses aman untuk melihat detail kelas.',
+        'Alur Pengajuan & Persetujuan Role: Mahasiswa yang mengajukan jabatan pengurus (misal: Sekretaris atau Bendahara) langsung dapat menggunakan aplikasi sebagai Anggota, sementara pengajuan jabatannya menunggu approval Super Admin (mrachmanfm@gmail.com).',
+        'Banner Status Role Pengajuan: Pemberitahuan status di bagian atas aplikasi yang menginformasikan bahwa permohonan role sedang ditinjau oleh Super Admin.',
+        'Panel Kelola Kelas di Layar Selamat Datang: Super Admin dapat mengedit detail kelas (nama, kode, dosen wali, kapasitas) maupun menghapus kelas langsung dari splash screen awal.',
+        'Tab Persetujuan Role di Modul Anggota: Memudahkan Super Admin menyetujui atau menolak permohonan role mahasiswa langsung dari menu Anggota maupun Pengaturan.',
+        'Isolasi Data Cloud Firestore Terjamin: Struktur namespace database terpisah (/classify_users, /classes/cls_01sakp014, /roleClaimRequests) sehingga data perkuliahan tidak bercampur dengan data aplikasi kuis/pembelajaran.',
+      ]
+    },
     {
       version: 'v3.1.0',
       date: '10 September 2026',

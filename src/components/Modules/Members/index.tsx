@@ -29,11 +29,12 @@ import {
   deleteMemberFromFirestore,
 } from '../../../services/firestoreSync.ts';
 import { ClassOrgChart } from './ClassOrgChart.tsx';
-import { Network } from 'lucide-react';
+import { RoleClaimApprovalPanel } from '../../Admin/RoleClaimApprovalPanel.tsx';
+import { Network, ShieldAlert } from 'lucide-react';
 
 export const MembersModule: React.FC = () => {
   const { hasPermission, classInfo, googleAccessToken, loginWithGoogle, isSuperAdmin } = useAuth();
-  const [activeTab, setActiveTab] = useState<'list' | 'orgchart'>('list');
+  const [activeTab, setActiveTab] = useState<'list' | 'orgchart' | 'claims'>('list');
   const [members, setMembers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [search, setSearch] = useState('');
@@ -300,31 +301,46 @@ export const MembersModule: React.FC = () => {
       </div>
 
       {/* Tab Switcher */}
-      <div className="border-b border-slate-200 flex items-center gap-6 text-sm font-semibold">
+      <div className="border-b border-slate-200 flex items-center gap-4 sm:gap-6 text-xs sm:text-sm font-semibold overflow-x-auto">
         <button
           onClick={() => setActiveTab('list')}
-          className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+          className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'list'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Users className="w-4 h-4" /> Data Roster Mahasiswa ({members.length})
+          <Users className="w-4 h-4" /> Data Roster ({members.length})
         </button>
 
         <button
           onClick={() => setActiveTab('orgchart')}
-          className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+          className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'orgchart'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Network className="w-4 h-4" /> Bagan Struktur Organisasi & Pengurus
+          <Network className="w-4 h-4" /> Bagan Struktur Organisasi
         </button>
+
+        {isSuperAdmin && (
+          <button
+            onClick={() => setActiveTab('claims')}
+            className={`pb-3 border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'claims'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4 text-indigo-600" /> Persetujuan Role Akun Google
+          </button>
+        )}
       </div>
 
-      {activeTab === 'orgchart' ? (
+      {activeTab === 'claims' ? (
+        <RoleClaimApprovalPanel />
+      ) : activeTab === 'orgchart' ? (
         <ClassOrgChart members={members} />
       ) : (
         <>

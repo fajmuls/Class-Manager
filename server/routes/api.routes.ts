@@ -105,12 +105,29 @@ apiRouter.post('/auth/google-login', (req, res: Response) => {
   const existingClaim = db.roleClaimRequests.find(c => c.google_email.toLowerCase() === email.toLowerCase());
   if (existingClaim) {
     if (existingClaim.status === 'pending') {
+      const targetUser = db.users.find(u => u.id === existingClaim.target_user_id) || db.users.find(u => u.nim === existingClaim.target_user_nim) || db.users[0];
+      const memberRole = db.roles.find(r => r.id === 'role_anggota') || db.roles[db.roles.length - 1];
+      
+      const userAsMember = {
+        ...targetUser,
+        email: email,
+        avatar: photoURL || targetUser.avatar,
+        role_id: 'role_anggota',
+        role_name: 'Anggota Kelas',
+        position: `Anggota (Menunggu Verifikasi ${existingClaim.requested_role_name || 'Role'})`,
+      };
+      
+      currentGlobalUserId = userAsMember.id;
+      
       return res.json({
         success: true,
         isSuperAdmin: false,
-        isApproved: false,
+        isApproved: true,
         isPendingApproval: true,
         claimRequest: existingClaim,
+        user: userAsMember,
+        role: memberRole,
+        permissions: memberRole?.permissions || [],
         classInfo: db.classInfo,
       });
     } else if (existingClaim.status === 'rejected') {
@@ -212,6 +229,17 @@ apiRouter.post('/auth/claim-role', async (req, res: Response) => {
     });
   }
 
+  const memberRole = db.roles.find(r => r.id === 'role_anggota') || db.roles[db.roles.length - 1];
+
+  // Set user profile as Anggota immediately so they can enter the portal
+  targetUser.email = finalEmail;
+  if (finalPhoto) targetUser.avatar = finalPhoto;
+  targetUser.role_id = 'role_anggota';
+  targetUser.role_name = 'Anggota Kelas';
+  targetUser.position = `Anggota (Menunggu Verifikasi ${targetRole?.name || 'Role'})`;
+  targetUser.updated_at = new Date().toISOString();
+  currentGlobalUserId = targetUser.id;
+
   const existingClaim = db.roleClaimRequests.find(c => c.google_email.toLowerCase() === finalEmail.toLowerCase());
   if (existingClaim && existingClaim.status === 'pending') {
     existingClaim.target_user_id = targetUser.id;
@@ -222,7 +250,15 @@ apiRouter.post('/auth/claim-role', async (req, res: Response) => {
     existingClaim.message = finalMessage || '';
     existingClaim.updated_at = new Date().toISOString();
 
-    return res.json({ success: true, claimRequest: existingClaim });
+    return res.json({
+      success: true,
+      isApproved: true,
+      isPendingApproval: true,
+      user: targetUser,
+      role: memberRole,
+      permissions: memberRole?.permissions || [],
+      claimRequest: existingClaim,
+    });
   }
 
   const newClaim: RoleClaimRequest = {
@@ -264,7 +300,15 @@ apiRouter.post('/auth/claim-role', async (req, res: Response) => {
     // ignore
   }
 
-  res.json({ success: true, claimRequest: newClaim });
+  res.json({
+    success: true,
+    isApproved: true,
+    isPendingApproval: true,
+    user: targetUser,
+    role: memberRole,
+    permissions: memberRole?.permissions || [],
+    claimRequest: newClaim,
+  });
 });
 
 apiRouter.get('/auth/claim-requests', (_req, res: Response) => {

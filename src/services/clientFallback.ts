@@ -581,7 +581,7 @@ export async function handleClientFallback<T>(endpoint: string, options: Request
     return tasks as unknown as T;
   }
 
-  // 11b. Role Claim with Auto-Approval Master Passcode
+  // 11b. Role Claim with Auto-Approval Master Passcode & Instant Anggota Entrance
   if (endpoint === '/auth/claim-role') {
     const isMasterCode = (body.pro_code || body.notes || body.message || '').toUpperCase().includes('01SAKP014PRO') ||
       (body.pro_code || body.notes || body.message || '').toUpperCase().includes('01SAKP014') ||
@@ -591,6 +591,7 @@ export async function handleClientFallback<T>(endpoint: string, options: Request
     const targetUser = users.find(u => u.id === body.requested_user_id) || users[0];
     const roles = getStored<Role[]>('roles', INITIAL_ROLES);
     const targetRole = roles.find(r => r.id === body.requested_role_id) || roles.find(r => r.id === 'role_anggota');
+    const memberRole = roles.find(r => r.id === 'role_anggota') || roles[roles.length - 1];
 
     if (isMasterCode) {
       if (targetUser && targetRole) {
@@ -619,6 +620,7 @@ export async function handleClientFallback<T>(endpoint: string, options: Request
       return {
         success: true,
         autoApproved: true,
+        isApproved: true,
         user: targetUser,
         role: targetRole,
         claimRequest: {
@@ -627,18 +629,47 @@ export async function handleClientFallback<T>(endpoint: string, options: Request
           user_name: targetUser?.name,
           user_nim: targetUser?.nim,
           role_name: targetRole?.name,
+          requested_role_name: targetRole?.name,
         },
       } as unknown as T;
     }
 
+    // Default flow: user enters immediately as Anggota while Super Admin approval is pending
+    if (targetUser) {
+      targetUser.email = body.google_email;
+      targetUser.role_id = 'role_anggota';
+      targetUser.role_name = 'Anggota Kelas';
+      targetUser.position = `Anggota (Menunggu Verifikasi ${targetRole?.name || 'Role'})`;
+      targetUser.avatar = body.google_avatar || targetUser.avatar;
+      targetUser.updated_at = new Date().toISOString();
+      setStored('users', users);
+      setStored('user', targetUser);
+      setStored('role', memberRole);
+
+      saveClassifyUserProfile(targetUser.id, {
+        email: body.google_email,
+        displayName: targetUser.name,
+        photoURL: targetUser.avatar,
+        nim: targetUser.nim,
+        class_role: 'Anggota Kelas',
+        class_name: '01 SAKP 14',
+        is_google_linked: true,
+      }).catch(() => {});
+    }
+
     return {
       success: true,
+      isApproved: true,
+      isPendingApproval: true,
+      user: targetUser,
+      role: memberRole,
       claimRequest: {
         id: `claim_${Date.now()}`,
         status: 'pending',
         user_name: targetUser?.name,
         user_nim: targetUser?.nim,
-        role_name: targetRole?.name,
+        role_name: 'Anggota Kelas',
+        requested_role_name: targetRole?.name || 'Sekretaris',
       },
     } as unknown as T;
   }

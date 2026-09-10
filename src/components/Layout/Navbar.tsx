@@ -122,28 +122,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onOpenSearch })
 
         {/* Right Section: Firestore Status, Global Search, Google Auth, Notification Center, User Profile */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Firestore Connection Status Badge */}
+          {/* Online Connection Status Badge */}
           <div
-            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${
+            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
               firestoreStatus === 'connected'
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                 : firestoreStatus === 'connecting'
-                ? 'bg-amber-50 text-amber-800 border-amber-200'
-                : 'bg-rose-50 text-rose-800 border-rose-200'
+                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                : 'bg-rose-50 text-rose-700 border-rose-200'
             }`}
-            title={`Status Database: ${
-              firestoreStatus === 'connected'
-                ? 'Cloud Firestore Terhubung Real-Time'
-                : firestoreStatus === 'connecting'
-                ? 'Menghubungkan ke Cloud Firestore...'
-                : 'Offline / Mode Cache Lokal'
-            }`}
+            title="Status Koneksi"
           >
             {firestoreStatus === 'connected' ? (
               <>
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="hidden lg:inline">Online (Firestore Terhubung)</span>
-                <span className="lg:hidden">Online</span>
+                <span>Online</span>
               </>
             ) : firestoreStatus === 'connecting' ? (
               <>
@@ -153,7 +146,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onOpenSearch })
             ) : (
               <>
                 <WifiOff className="w-3 h-3 text-rose-500" />
-                <span>Mode Offline</span>
+                <span>Offline</span>
               </>
             )}
           </div>

@@ -260,6 +260,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setPermissions(syncRes.permissions as PermissionCode[]);
           setClassInfo(syncRes.classInfo);
           syncCache(syncRes.user, syncRes.role, syncRes.classInfo);
+
+          if (!syncRes.requiresClaim) {
+            setHasEnteredPortal(true);
+            localStorage.setItem('cms_has_entered_portal', 'true');
+          }
         }
         const usersList = await api.getAllUsers();
         setAllUsers(usersList);
