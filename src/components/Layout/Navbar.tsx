@@ -1,8 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
-import { Search, Bell, Menu, CheckCircle2, LogIn, LogOut, ShieldCheck, KeyRound } from 'lucide-react';
+import { Search, Bell, Menu, CheckCircle2, LogIn, LogOut, ShieldCheck, KeyRound, GraduationCap, Wifi, WifiOff } from 'lucide-react';
 import { api } from '../../services/api.ts';
-import { NotificationItem } from '../../types/index.ts';
+import { NotificationItem, ClassInfo } from '../../types/index.ts';
+import {
+  getConnectionStatus,
+  subscribeToConnectionStatus,
+  FirestoreConnectionStatus,
+  fetchClassesFromFirestore,
+} from '../../services/firestoreSync.ts';
+import { ClassSetupModal } from '../Admin/ClassSetupModal.tsx';
 
 interface NavbarProps {
   onToggleSidebar: () => void;
@@ -23,6 +30,27 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onOpenSearch })
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [firestoreStatus, setFirestoreStatus] = useState<FirestoreConnectionStatus>(getConnectionStatus());
+  const [showClassModal, setShowClassModal] = useState(false);
+  const [existingClasses, setExistingClasses] = useState<ClassInfo[]>([]);
+
+  useEffect(() => {
+    const unsub = subscribeToConnectionStatus((status) => {
+      setFirestoreStatus(status);
+    });
+    return () => unsub();
+  }, []);
+
+  const loadClasses = async () => {
+    try {
+      const cls = await fetchClassesFromFirestore();
+      setExistingClasses(cls);
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadClasses();
+  }, []);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -74,6 +102,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onOpenSearch })
                 <span className="hidden sm:inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
                   {classInfo?.code || '01SAKP014'}
                 </span>
+                {isSuperAdmin && (
+                  <button
+                    onClick={() => setShowClassModal(true)}
+                    className="ml-1 px-2 py-0.5 text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-md border border-indigo-200 transition-colors flex items-center gap-1 cursor-pointer"
+                    title="Kelola atau Buat Kelas di Cloud Firestore"
+                  >
+                    <GraduationCap className="w-3 h-3" />
+                    <span className="hidden md:inline">Kelola Kelas</span>
+                  </button>
+                )}
               </div>
               <p className="text-[11px] text-slate-500 hidden md:block">
                 {classInfo?.major || 'S1 Akuntansi'} • {classInfo?.faculty || 'Fakultas Ekonomi dan Bisnis'}
@@ -82,8 +120,43 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onOpenSearch })
           </div>
         </div>
 
-        {/* Right Section: Global Search, Google Auth, Notification Center, User Profile */}
+        {/* Right Section: Firestore Status, Global Search, Google Auth, Notification Center, User Profile */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Firestore Connection Status Badge */}
+          <div
+            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all ${
+              firestoreStatus === 'connected'
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : firestoreStatus === 'connecting'
+                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                : 'bg-rose-50 text-rose-800 border-rose-200'
+            }`}
+            title={`Status Database: ${
+              firestoreStatus === 'connected'
+                ? 'Cloud Firestore Terhubung Real-Time'
+                : firestoreStatus === 'connecting'
+                ? 'Menghubungkan ke Cloud Firestore...'
+                : 'Offline / Mode Cache Lokal'
+            }`}
+          >
+            {firestoreStatus === 'connected' ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="hidden lg:inline">Online (Firestore Terhubung)</span>
+                <span className="lg:hidden">Online</span>
+              </>
+            ) : firestoreStatus === 'connecting' ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                <span>Menghubungkan...</span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="w-3 h-3 text-rose-500" />
+                <span>Mode Offline</span>
+              </>
+            )}
+          </div>
           {/* Quick Search trigger */}
           <button
             onClick={onOpenSearch}
@@ -279,6 +352,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onOpenSearch })
           </div>
         </div>
       </div>
+
+      {showClassModal && (
+        <ClassSetupModal
+          isOpen={showClassModal}
+          onClose={() => {
+            setShowClassModal(false);
+            loadClasses();
+          }}
+          existingClasses={existingClasses}
+          onClassSelected={() => {
+            loadClasses();
+          }}
+        />
+      )}
     </header>
   );
 };

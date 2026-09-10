@@ -3,6 +3,7 @@ import { useAuth } from '../../../context/AuthContext.tsx';
 import { api } from '../../../services/api.ts';
 import { testFirestoreConnection, FirestoreConnectionResult } from '../../../services/firebase.ts';
 import { RoleClaimApprovalPanel } from '../../Admin/RoleClaimApprovalPanel.tsx';
+import { exportClassBackupJSON } from '../../../services/firestoreSync.ts';
 import {
   Settings,
   Save,
@@ -30,6 +31,7 @@ import {
   Database,
   RefreshCw,
   ExternalLink,
+  FileJson,
 } from 'lucide-react';
 
 export const SettingsModule: React.FC = () => {
@@ -46,12 +48,26 @@ export const SettingsModule: React.FC = () => {
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isExportingBackup, setIsExportingBackup] = useState(false);
 
   // App version according to user instruction
-  const APP_VERSION = 'v2.7.3';
-  const BUILD_DATE = '9 September 2026 (Firebase Service, Zero-404 Vercel Resiliency & Schema Rules)';
+  const APP_VERSION = 'v2.8.0';
+  const BUILD_DATE = '10 September 2026 (Class Manager Flow, Firestore Real-time Sync & Data Backup)';
 
   const PATCH_NOTES = [
+    {
+      version: 'v2.8.0',
+      date: '10 September 2026',
+      type: 'Class Manager Engine, Real-time Member Sync & Data Backup',
+      notes: [
+        'Class Manager Flow: Alur inisialisasi kelas untuk Super Admin (mrachmanfm@gmail.com) jika belum ada kelas terdeteksi di Firestore, lengkap dengan pemilihan Jurusan, Fakultas, dan Iuran.',
+        'Real-time Firestore Member Sync: Sinkronisasi satu arah via onSnapshot pada koleksi /users, memastikan anggota baru dan login akun Google langsung tampil real-time di seluruh perangkat (AI Studio & Vercel).',
+        'Vercel Data Parity: Menghubungkan clientFallback langsung ke Cloud Firestore agar data di Vercel sama persis dengan preview (tidak lagi 0 anggota).',
+        'Header Online/Offline Badge: Indikator status real-time koneksi Firestore di header atas aplikasi dengan status pulsing.',
+        'Ekspor Cadangan Data Kelas: Fitur unduh backup lengkap data kelas, anggota, transaksi kas, agenda, dan tugas dalam 1 file JSON offline.',
+        'Zero WebSocket Noise: Penekanan error WebSocket/HMR pada log terminal dan browser.',
+      ]
+    },
     {
       version: 'v2.7.3',
       date: '9 September 2026',
@@ -994,6 +1010,45 @@ export const SettingsModule: React.FC = () => {
               );
             })}
           </div>
+        </div>
+      </div>
+
+      {/* Backup & Cadangan Data Offline (User Request) */}
+      <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+              <FileJson className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">
+                Cadangan Data Kelas Offline (JSON Backup)
+              </h3>
+              <p className="text-xs text-slate-500">
+                Ekspor seluruh data kelas, anggota, transaksi kas, agenda, dan tugas ke dalam 1 file cadangan offline.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            disabled={isExportingBackup}
+            onClick={async () => {
+              try {
+                setIsExportingBackup(true);
+                await exportClassBackupJSON(classInfo, allUsers);
+              } catch (err) {
+                console.error('Backup error:', err);
+                alert('Gagal mengunduh cadangan data.');
+              } finally {
+                setIsExportingBackup(false);
+              }
+            }}
+            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+          >
+            <Download className="w-4 h-4" />
+            {isExportingBackup ? 'Menyiapkan Cadangan...' : 'Download Cadangan Data Kelas'}
+          </button>
         </div>
       </div>
 

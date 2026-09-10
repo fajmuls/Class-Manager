@@ -10,6 +10,23 @@
     <meta name="apple-mobile-web-app-title" content="KelasManajer" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <script>
+      // Suppress benign WebSocket / Vite dev server HMR disconnection notices
+      window.addEventListener('unhandledrejection', function (e) {
+        var msg = (e && e.reason && (e.reason.message || e.reason)) || '';
+        if (typeof msg === 'string' && (msg.indexOf('WebSocket') !== -1 || msg.indexOf('vite') !== -1)) {
+          e.preventDefault();
+          e.stopImmediatePropagation && e.stopImmediatePropagation();
+        }
+      });
+      window.addEventListener('error', function (e) {
+        var msg = (e && e.message) || '';
+        if (typeof msg === 'string' && (msg.indexOf('WebSocket') !== -1 || msg.indexOf('vite') !== -1)) {
+          e.preventDefault();
+          e.stopImmediatePropagation && e.stopImmediatePropagation();
+        }
+      });
+    </script>
     <title>Kelas Manajer 01SAKP014</title>
     <meta name="description" content="Sistem administrasi kelas perkuliahan berbasis Role-Based Access Control (RBAC) dengan transparansi kas, agenda, pengumuman, dan tata kelola terintegrasi." />
     <meta property="og:title" content="Kelas Manajer 01SAKP014" />

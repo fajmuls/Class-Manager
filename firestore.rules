@@ -126,8 +126,19 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
-    // Class Information & Metadata
+    // Class Information & Metadata (Safe public read so guests and new logins can see class name)
+    match /classes/{classId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
     match /classInfo/{classId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // Members Collection (In addition to users collection)
+    match /members/{memberId} {
       allow read: if isSignedIn();
       allow write: if isSuperAdmin();
     }

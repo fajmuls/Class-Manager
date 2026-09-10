@@ -23,9 +23,14 @@ import {
 import { Badge } from '../../UI/Badge.tsx';
 import { Modal } from '../../UI/Modal.tsx';
 import { googleWorkspace } from '../../../services/googleWorkspace.ts';
+import {
+  subscribeToMembers,
+  saveMemberToFirestore,
+  deleteMemberFromFirestore,
+} from '../../../services/firestoreSync.ts';
 
 export const MembersModule: React.FC = () => {
-  const { hasPermission, classInfo, googleAccessToken, loginWithGoogle } = useAuth();
+  const { hasPermission, classInfo, googleAccessToken, loginWithGoogle, isSuperAdmin } = useAuth();
   const [members, setMembers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [search, setSearch] = useState('');
@@ -71,6 +76,14 @@ export const MembersModule: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    // Realtime sync listener on users collection
+    const unsub = subscribeToMembers((liveMembers) => {
+      if (liveMembers && liveMembers.length > 0) {
+        setMembers(liveMembers);
+        setIsLoading(false);
+      }
+    });
+    return () => unsub();
   }, []);
 
   const filteredMembers = useMemo(() => {
@@ -98,7 +111,10 @@ export const MembersModule: React.FC = () => {
   const handleCreateMember = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.createMember(formData);
+      // 1. Direct write to Cloud Firestore for instant persistence on Vercel and Preview
+      await saveMemberToFirestore(formData);
+      // 2. Call API endpoint if backend available
+      await api.createMember(formData).catch(() => {});
       setIsAddModalOpen(false);
       setFormData({ name: '', nim: '', email: '', phone: '', role_id: 'role_anggota', position: 'Anggota' });
       await loadData();
@@ -111,7 +127,8 @@ export const MembersModule: React.FC = () => {
     e.preventDefault();
     if (!selectedMember) return;
     try {
-      await api.updateMember(selectedMember.id, formData);
+      await saveMemberToFirestore({ id: selectedMember.id, ...formData });
+      await api.updateMember(selectedMember.id, formData).catch(() => {});
       setIsEditModalOpen(false);
       await loadData();
     } catch (err: any) {
@@ -123,7 +140,14 @@ export const MembersModule: React.FC = () => {
     e.preventDefault();
     if (!selectedMember) return;
     try {
-      await api.assignRole(selectedMember.id, formData.role_id);
+      const targetRole = roles.find(r => r.id === formData.role_id);
+      await saveMemberToFirestore({
+        id: selectedMember.id,
+        role_id: formData.role_id,
+        role_name: targetRole?.name || 'Anggota',
+        position: targetRole?.name || 'Anggota',
+      });
+      await api.assignRole(selectedMember.id, formData.role_id).catch(() => {});
       setIsRoleModalOpen(false);
       await loadData();
     } catch (err: any) {
@@ -134,7 +158,8 @@ export const MembersModule: React.FC = () => {
   const handleDeactivate = async (member: User) => {
     if (confirm(`Apakah Anda yakin ingin menonaktifkan status ${member.name}?`)) {
       try {
-        await api.deactivateMember(member.id);
+        await deleteMemberFromFirestore(member.id);
+        await api.deactivateMember(member.id).catch(() => {});
         await loadData();
       } catch (err: any) {
         alert(err.message || 'Gagal menonaktifkan anggota');
