@@ -346,6 +346,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onOpenSearch })
                       </button>
                     </>
                   )}
+                  <button
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      logoutGoogle();
+                    }}
+                    className="w-full px-4 py-2 text-left text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-800 flex items-center gap-2 cursor-pointer font-medium border-t border-slate-100 mt-1"
+                  >
+                    <LogOut className="w-4 h-4" /> Keluar ke Layar Awal
+                  </button>
                 </div>
               </div>
             )}

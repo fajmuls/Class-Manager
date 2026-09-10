@@ -146,7 +146,14 @@ export const GoogleRoleClaimModal: React.FC<GoogleRoleClaimModalProps> = ({
         requested_user_id: selectedStudentId,
         requested_role_id: selectedRoleId,
         notes: payloadNotes,
+        pro_code: proCodeInput.trim(),
       });
+
+      if (res.autoApproved) {
+        // Instant unlock!
+        await refreshAuth();
+        return;
+      }
 
       if (res.success) {
         setIsPending(true);
@@ -320,12 +327,17 @@ export const GoogleRoleClaimModal: React.FC<GoogleRoleClaimModalProps> = ({
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-800 mb-1 flex items-center gap-1">
-                  <KeyRound className="w-3.5 h-3.5 text-amber-600" /> Kode Pro / Akses (Opsional)
+                <label className="block font-semibold text-slate-800 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <KeyRound className="w-3.5 h-3.5 text-amber-600" /> Kode Pro / Akses
+                  </span>
+                  <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded">
+                    01SAKP014PRO
+                  </span>
                 </label>
                 <input
                   type="text"
-                  placeholder="Contoh: PRO-2026"
+                  placeholder="Ketik 01SAKP014PRO untuk Auto-Approval..."
                   value={proCodeInput}
                   onChange={(e) => setProCodeInput(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-blue-500 text-slate-800 font-mono"

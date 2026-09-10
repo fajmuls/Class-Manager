@@ -492,9 +492,15 @@ export async function handleClientFallback<T>(endpoint: string, options: Request
     return events as unknown as T;
   }
 
-  // 10. Announcements
+  // 10. Announcements & Meetings
   if (endpoint.startsWith('/announcements')) {
     let ann = getStored<Announcement[]>('announcements', INITIAL_ANNOUNCEMENTS);
+    if (method === 'DELETE') {
+      const id = endpoint.split('/').pop();
+      ann = ann.filter(a => a.id !== id);
+      setStored('announcements', ann);
+      return { success: true } as unknown as T;
+    }
     if (method === 'POST') {
       const newAnn: Announcement = {
         id: 'anc_' + Date.now(),
@@ -515,9 +521,45 @@ export async function handleClientFallback<T>(endpoint: string, options: Request
     return ann as unknown as T;
   }
 
+  // 10b. Meetings
+  if (endpoint.startsWith('/meetings')) {
+    let meetings = getStored<any[]>('meetings', []);
+    if (method === 'DELETE') {
+      const id = endpoint.split('/').pop();
+      meetings = meetings.filter(m => m.id !== id);
+      setStored('meetings', meetings);
+      return { success: true } as unknown as T;
+    }
+    if (method === 'POST') {
+      const newMeeting = {
+        id: 'mtg_' + Date.now(),
+        class_id: 'cls_01sakp014',
+        title: body.title || 'Rapat Koordinasi',
+        date: body.date || new Date().toISOString().split('T')[0],
+        start_time: body.start_time || '09:00',
+        end_time: body.end_time || '11:00',
+        location: body.location || 'Ruang Rapat',
+        agenda: body.agenda || '',
+        status: 'scheduled',
+        created_at: new Date().toISOString(),
+        ...body,
+      };
+      meetings.unshift(newMeeting);
+      setStored('meetings', meetings);
+      return newMeeting as unknown as T;
+    }
+    return meetings as unknown as T;
+  }
+
   // 11. Tasks
   if (endpoint.startsWith('/tasks')) {
     let tasks = getStored<TaskItem[]>('tasks', INITIAL_TASKS);
+    if (method === 'DELETE') {
+      const id = endpoint.split('/').pop();
+      tasks = tasks.filter(t => t.id !== id);
+      setStored('tasks', tasks);
+      return { success: true } as unknown as T;
+    }
     if (method === 'POST') {
       const newTask: TaskItem = {
         id: 'tsk_' + Date.now(),
@@ -537,6 +579,68 @@ export async function handleClientFallback<T>(endpoint: string, options: Request
       return newTask as unknown as T;
     }
     return tasks as unknown as T;
+  }
+
+  // 11b. Role Claim with Auto-Approval Master Passcode
+  if (endpoint === '/auth/claim-role') {
+    const isMasterCode = (body.pro_code || body.notes || body.message || '').toUpperCase().includes('01SAKP014PRO') ||
+      (body.pro_code || body.notes || body.message || '').toUpperCase().includes('01SAKP014') ||
+      (body.pro_code || body.notes || body.message || '').toUpperCase().includes('SAKP14PRO');
+
+    const users = getStored<User[]>('users', INITIAL_USERS);
+    const targetUser = users.find(u => u.id === body.requested_user_id) || users[0];
+    const roles = getStored<Role[]>('roles', INITIAL_ROLES);
+    const targetRole = roles.find(r => r.id === body.requested_role_id) || roles.find(r => r.id === 'role_anggota');
+
+    if (isMasterCode) {
+      if (targetUser && targetRole) {
+        targetUser.email = body.google_email;
+        targetUser.role_id = targetRole.id;
+        targetUser.role_name = targetRole.name;
+        targetUser.position = targetRole.name;
+        targetUser.avatar = body.google_avatar || targetUser.avatar;
+        targetUser.updated_at = new Date().toISOString();
+        setStored('users', users);
+        setStored('user', targetUser);
+        setStored('role', targetRole);
+
+        // Sync to isolated Firestore namespace
+        saveClassifyUserProfile(targetUser.id, {
+          email: body.google_email,
+          displayName: targetUser.name,
+          photoURL: targetUser.avatar,
+          nim: targetUser.nim,
+          class_role: targetRole.name,
+          class_name: '01 SAKP 14',
+          is_google_linked: true,
+        }).catch(() => {});
+      }
+
+      return {
+        success: true,
+        autoApproved: true,
+        user: targetUser,
+        role: targetRole,
+        claimRequest: {
+          id: `claim_auto_${Date.now()}`,
+          status: 'approved',
+          user_name: targetUser?.name,
+          user_nim: targetUser?.nim,
+          role_name: targetRole?.name,
+        },
+      } as unknown as T;
+    }
+
+    return {
+      success: true,
+      claimRequest: {
+        id: `claim_${Date.now()}`,
+        status: 'pending',
+        user_name: targetUser?.name,
+        user_nim: targetUser?.nim,
+        role_name: targetRole?.name,
+      },
+    } as unknown as T;
   }
 
   // 12. Semesters Settings

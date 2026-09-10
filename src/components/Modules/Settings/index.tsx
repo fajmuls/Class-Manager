@@ -51,10 +51,22 @@ export const SettingsModule: React.FC = () => {
   const [isExportingBackup, setIsExportingBackup] = useState(false);
 
   // App version according to user instruction
-  const APP_VERSION = 'v2.9.0';
-  const BUILD_DATE = '10 September 2026 (01 SAKP 14 Engine, 39 Template Students, NIM Pro Code Claim & Announcements-Meetings Hub)';
+  const APP_VERSION = 'v3.0.0';
+  const BUILD_DATE = '10 September 2026 (Portal Splash Screen, Master Auto-Approval Passcode, Isolated Cloud Database & PDF/Excel Exports)';
 
   const PATCH_NOTES = [
+    {
+      version: 'v3.0.0',
+      date: '10 September 2026',
+      type: 'Portal Splash Screen, Master Passcode Auto-Approval & DB Isolation',
+      notes: [
+        'Layar Awal Splash Screen: Tampilan landing portal sebelum masuk kelas dengan pilihan profil cepat, statistik kelas, dan integrasi tombol Keluar Akun.',
+        'Master Passcode Auto-Approval: Mahasiswa yang memasukkan kode pro (01SAKP014PRO) pada formulir Google login langsung terverifikasi otomatis tanpa approval manual.',
+        'Isolasi Database Antar-Aplikasi: Koleksi Firestore terisolasi khusus (/classify_users dan /classes/cls_01sakp014) agar user ID dan profil tidak bercampur dengan aplikasi lain.',
+        'Ekspor Laporan PDF & Excel: Dukungan cetak 1-klik untuk Notulensi Rapat, Laporan Kas Bulanan, dan Direktori Anggota Kelas.',
+        'Penyempurnaan Hapus Data Real-time: Penghapusan instan tugas, agenda, notulensi rapat, dan pengumuman yang langsung ter-update di antarmuka pengguna.',
+      ]
+    },
     {
       version: 'v2.9.0',
       date: '10 September 2026',

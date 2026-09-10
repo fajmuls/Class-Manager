@@ -20,6 +20,7 @@ interface AuthContextType {
   classInfo: ClassInfo | null;
   allUsers: User[];
   isLoading: boolean;
+  hasEnteredPortal: boolean;
   firebaseUser: FirebaseUser | null;
   googleAccessToken: string | null;
   isSuperAdmin: boolean;
@@ -30,6 +31,8 @@ interface AuthContextType {
   };
   hasPermission: (permission: PermissionCode) => boolean;
   switchUser: (userId: string) => Promise<void>;
+  enterPortal: (userId?: string) => Promise<void>;
+  exitPortal: () => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   loginWithEmailDirect: (email: string, displayName?: string) => Promise<void>;
   openDomainHelper: () => void;
@@ -80,6 +83,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // If cache exists, app can render immediately while revalidating
   const [isLoading, setIsLoading] = useState(() => {
     return !localStorage.getItem('cms_cached_user');
+  });
+  const [hasEnteredPortal, setHasEnteredPortal] = useState<boolean>(() => {
+    return localStorage.getItem('cms_has_entered_portal') === 'true';
   });
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [googleAccessToken, setGoogleAccessTokenState] = useState<string | null>(getAccessToken());
@@ -321,20 +327,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const openDomainHelper = () => setShowDomainModal(true);
 
-  const logoutGoogle = async () => {
+  const enterPortal = async (userId?: string) => {
+    setIsLoading(true);
+    try {
+      if (userId) {
+        await api.switchUser(userId);
+      }
+      await loadInitialData();
+      setHasEnteredPortal(true);
+      localStorage.setItem('cms_has_entered_portal', 'true');
+    } catch (err) {
+      console.error('Failed to enter portal:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const exitPortal = async () => {
     try {
       setIsLoading(true);
       await signOutFirebase();
       setGoogleAccessTokenState(null);
       setFirebaseUser(null);
       setClaimStatus({ requiresClaim: false, isPendingApproval: false });
-      await api.switchUser('usr_superadmin');
-      await loadInitialData();
+      setHasEnteredPortal(false);
+      localStorage.removeItem('cms_has_entered_portal');
+      localStorage.removeItem('cms_cached_user');
+      localStorage.removeItem('cms_cached_role');
+      setUser(null);
+      setRole(null);
     } catch (err) {
-      console.error('Logout error:', err);
+      console.error('Exit portal error:', err);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const logoutGoogle = async () => {
+    await exitPortal();
   };
 
   const isSuperAdmin = Boolean(
@@ -391,12 +421,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         classInfo,
         allUsers,
         isLoading,
+        hasEnteredPortal,
         firebaseUser,
         googleAccessToken,
         isSuperAdmin,
         claimStatus,
         hasPermission,
         switchUser,
+        enterPortal,
+        exitPortal,
         loginWithGoogle,
         loginWithEmailDirect,
         openDomainHelper,

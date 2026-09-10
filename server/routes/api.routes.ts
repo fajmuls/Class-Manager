@@ -168,6 +168,50 @@ apiRouter.post('/auth/claim-role', async (req, res: Response) => {
     return res.status(404).json({ error: 'Data mahasiswa tidak ditemukan' });
   }
 
+  // Check for Auto-Approval Master Passcode (e.g. 01SAKP014PRO, 01SAKP014, SAKP14PRO)
+  const isMasterCode = (req.body.pro_code || finalMessage || '').toUpperCase().includes('01SAKP014PRO') ||
+    (req.body.pro_code || finalMessage || '').toUpperCase().includes('01SAKP014') ||
+    (req.body.pro_code || finalMessage || '').toUpperCase().includes('SAKP14PRO');
+
+  if (isMasterCode) {
+    // Instant Auto-Approval!
+    targetUser.email = finalEmail;
+    if (finalPhoto) targetUser.avatar = finalPhoto;
+    if (targetRole) {
+      targetUser.role_id = targetRole.id;
+      targetUser.role_name = targetRole.name;
+    }
+    targetUser.updated_at = new Date().toISOString();
+    currentGlobalUserId = targetUser.id;
+
+    const autoClaim: RoleClaimRequest = {
+      id: `claim_auto_${Date.now()}`,
+      google_email: finalEmail,
+      google_name: finalName || targetUser.name,
+      google_photo: finalPhoto,
+      target_user_id: targetUser.id,
+      target_user_name: targetUser.name,
+      target_user_nim: targetUser.nim,
+      requested_role_id: targetRole?.id || 'role_anggota',
+      requested_role_name: targetRole?.name || 'Anggota',
+      status: 'approved',
+      message: 'Otomatis Terverifikasi via Master Passcode Pro Kelas',
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: 'Auto-Approval Master Passcode System',
+      created_at: new Date().toISOString(),
+    };
+
+    db.roleClaimRequests.unshift(autoClaim);
+
+    return res.json({
+      success: true,
+      autoApproved: true,
+      user: targetUser,
+      role: targetRole,
+      claimRequest: autoClaim,
+    });
+  }
+
   const existingClaim = db.roleClaimRequests.find(c => c.google_email.toLowerCase() === finalEmail.toLowerCase());
   if (existingClaim && existingClaim.status === 'pending') {
     existingClaim.target_user_id = targetUser.id;

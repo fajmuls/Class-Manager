@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
+import { SplashScreen } from './components/Auth/SplashScreen.tsx';
 import { RoleSwitcherBar } from './components/Layout/RoleSwitcherBar.tsx';
 import { Navbar } from './components/Layout/Navbar.tsx';
 import { Sidebar } from './components/Layout/Sidebar.tsx';
@@ -25,7 +26,7 @@ import { GoogleRoleClaimModal } from './components/Auth/GoogleRoleClaimModal.tsx
 import { DashboardSkeleton } from './components/UI/DashboardSkeleton.tsx';
 
 const AppContent: React.FC = () => {
-  const { user, role, isLoading, claimStatus } = useAuth();
+  const { user, role, isLoading, hasEnteredPortal, enterPortal, loginWithGoogle, claimStatus } = useAuth();
   const [currentModule, setCurrentModule] = useState<string>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -65,6 +66,21 @@ const AppContent: React.FC = () => {
 
   if (isLoading) {
     return <DashboardSkeleton />;
+  }
+
+  // If user hasn't entered or logged out, show the Portal Splash Screen
+  if (!hasEnteredPortal || !user) {
+    return (
+      <>
+        <SplashScreen
+          onEnterAsUser={(userId) => enterPortal(userId)}
+          onLoginGoogle={loginWithGoogle}
+        />
+        <GoogleRoleClaimModal
+          isOpen={claimStatus.requiresClaim || claimStatus.isPendingApproval}
+        />
+      </>
+    );
   }
 
   return (

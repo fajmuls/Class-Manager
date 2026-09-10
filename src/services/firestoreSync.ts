@@ -470,6 +470,19 @@ export async function deleteMemberFromFirestore(userId: string): Promise<boolean
   }
 }
 
+export async function deleteFirestoreDocument(collectionName: string, id: string): Promise<boolean> {
+  try {
+    const { deleteDoc } = await import('../lib/firebase.ts');
+    await deleteDoc(doc(db, collectionName, id));
+    // Also delete from subcollection under 01 SAKP 14 if applicable
+    await deleteDoc(doc(db, 'classes', 'cls_01sakp014', collectionName, id)).catch(() => {});
+    return true;
+  } catch (err) {
+    console.warn(`Firestore delete warning for ${collectionName}/${id}:`, err);
+    return false;
+  }
+}
+
 // ==========================================
 // 4. EXPORT LOCAL JSON BACKUP
 // ==========================================
@@ -492,11 +505,11 @@ export async function exportClassBackupJSON(
   } catch {}
 
   const backupData = {
-    app_version: 'v2.9.0',
+    app_version: 'v3.0.0',
     app_name: 'Kelas Manajer 01 SAKP 14',
     exported_at: new Date().toISOString(),
     system: {
-      platform: 'Web Client / PWA / Cloud Firestore',
+      platform: 'Web Client / PWA / Cloud Firestore (Classify Pro Isolated)',
       environment: 'Spark Free Tier (Zero Paid Dependencies)',
     },
     class_info: classInfo || DEFAULT_CLASS_01SAKP014,

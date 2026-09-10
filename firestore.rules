@@ -88,6 +88,11 @@ service cloud.firestore {
     // ===============================================================
     // Classify Pro Collections (Class Management App - 01 SAKP 14)
     // ===============================================================
+    // Dedicated isolated user profile collection for Classify Pro (Prevents collisions with App 1)
+    match /classify_users/{userId} {
+      allow read, write: if true;
+    }
+
     // Classes collection (01 SAKP 14 and created classes)
     match /classes/{classId} {
       allow read, write: if true;

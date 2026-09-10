@@ -120,7 +120,8 @@ class ApiService {
     requested_user_id: string;
     requested_role_id: string;
     notes?: string;
-  }): Promise<{ success: boolean; claimRequest: RoleClaimRequest }> {
+    pro_code?: string;
+  }): Promise<{ success: boolean; claimRequest: RoleClaimRequest; autoApproved?: boolean; user?: User; role?: Role }> {
     return this.request('/auth/claim-role', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -348,6 +349,10 @@ class ApiService {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+  }
+
+  async deleteMeeting(id: string): Promise<{ success: boolean }> {
+    return this.request(`/meetings/${id}`, { method: 'DELETE' });
   }
 
   // Tasks

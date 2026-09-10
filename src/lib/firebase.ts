@@ -54,8 +54,9 @@ export {
 export type { DocumentData, QueryDocumentSnapshot };
 
 /**
- * Helper to safely save or merge Classify Pro profile in the shared /users/{userId} collection.
- * Uses { merge: true } to guarantee it NEVER overwrites fields from other apps (e.g. quiz_stats, xp, rank).
+ * Helper to safely save Classify Pro profile in the dedicated /classify_users/{userId} collection
+ * and /classes/cls_01sakp014/members/{userId}.
+ * This completely isolates Classify Pro database records from any other applications.
  */
 export async function saveClassifyUserProfile(
   userId: string,
@@ -69,17 +70,20 @@ export async function saveClassifyUserProfile(
     class_name?: string;
     attendance_number?: number;
     phone?: string;
+    is_google_linked?: boolean;
   }
 ) {
   try {
-    const userRef = doc(db, 'users', userId);
     const now = new Date().toISOString();
     
-    // Explicitly isolated Classify Pro namespace
+    // Explicitly isolated Classify Pro namespace in /classify_users
     const payload: Record<string, any> = {
+      id: userId,
       email: profileData.email,
       updated_at: now,
       classify_pro_last_active: now,
+      is_google_linked: true,
+      last_login_at: now,
     };
 
     if (profileData.displayName) payload.displayName = profileData.displayName;
@@ -91,8 +95,15 @@ export async function saveClassifyUserProfile(
     if (profileData.attendance_number !== undefined) payload.attendance_number = profileData.attendance_number;
     if (profileData.phone) payload.phone = profileData.phone;
 
-    // Set with merge: true to avoid overwriting quiz app fields
-    await setDoc(userRef, payload, { merge: true });
+    // 1. Write to isolated classify_users collection
+    await setDoc(doc(db, 'classify_users', userId), payload, { merge: true });
+    
+    // 2. Also update student in class members collection
+    if (profileData.nim || userId) {
+      await setDoc(doc(db, 'classes', 'cls_01sakp014', 'members', userId), payload, { merge: true });
+      await setDoc(doc(db, 'members', userId), payload, { merge: true });
+    }
+
     return true;
   } catch (err) {
     console.warn('Firestore profile save warning (fallback to local cache):', err);
