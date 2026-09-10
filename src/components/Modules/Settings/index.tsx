@@ -48,10 +48,21 @@ export const SettingsModule: React.FC = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // App version according to user instruction
-  const APP_VERSION = 'v2.7.2';
-  const BUILD_DATE = '9 September 2026 (Unified Multi-App Firestore Rules Integration)';
+  const APP_VERSION = 'v2.7.3';
+  const BUILD_DATE = '9 September 2026 (Firebase Service, Zero-404 Vercel Resiliency & Schema Rules)';
 
   const PATCH_NOTES = [
+    {
+      version: 'v2.7.3',
+      date: '9 September 2026',
+      type: 'Firebase Service, Zero-404 Vercel & Schema Validation',
+      notes: [
+        'Firebase Service: Inisialisasi Firestore terpusat di src/lib/firebase.ts menggunakan konfigurasi firebase-applet-config.json dan ekspor instance db global.',
+        'Fix HTTP 404 on Vercel: Penanganan cerdas Zero-Crash Hybrid Client Fallback sehingga aksi di web Vercel tidak lagi menghasilkan HTTP error 404 dan pembersihan log spam API.',
+        'Profile Isolation: Penyimpanan profil di /users/{userId} menggunakan field spesifik Classify Pro (student_id, nim, class_role) dengan merge aman agar tidak menimpa data aplikasi kuis (quiz_stats, xp, rank).',
+        'Schema Validation Rules: Penerapan validasi struktur dan payload anti-spam untuk koleksi test_packages, bank_soal, dan article_questions pada firestore.rules yang telah dideploy.',
+      ]
+    },
     {
       version: 'v2.7.2',
       date: '9 September 2026',

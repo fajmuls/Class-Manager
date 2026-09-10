@@ -65,7 +65,7 @@ service cloud.firestore {
     }
 
     // ===============================================================
-    // Learning & Quiz App Collections (App 2)
+    // Learning & Quiz App Collections (App 2) with Schema & Size Validation
     // ===============================================================
     match /benchmark_scores/{scoreId} {
       // Anyone can read the benchmark leaderboard
@@ -84,17 +84,25 @@ service cloud.firestore {
     match /test_packages/{packageId} {
       // Anyone can read test packages
       allow read: if true;
-      // Allow anyone to write test packages (guest access support)
-      allow write: if true;
+      // Validasi schema: harus memiliki title bertipe string (1 - 250 karakter) untuk mencegah data kotor/spam
+      allow write: if request.resource.data.keys().hasAll(['title'])
+                   && request.resource.data.title is string
+                   && request.resource.data.title.size() > 0
+                   && request.resource.data.title.size() <= 250;
     }
 
     match /bank_soal/{questionId} {
-      allow read, write: if true;
+      allow read: if true;
+      // Validasi schema: harus memiliki pertanyaan/question atau title, serta batas field dokumen
+      allow write: if (request.resource.data.keys().hasAny(['question', 'pertanyaan', 'title']))
+                   && request.resource.data.size() <= 40;
     }
 
     match /article_questions/{questionId} {
       allow read: if true;
-      allow write: if true;
+      // Validasi schema: harus memiliki title, article_id, atau question, serta batas field dokumen
+      allow write: if (request.resource.data.keys().hasAny(['title', 'article_id', 'question', 'pertanyaan']))
+                   && request.resource.data.size() <= 40;
     }
 
     match /battles/{battleId} {

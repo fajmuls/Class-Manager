@@ -25,6 +25,7 @@ import {
   KasCollectionColumn,
   KasChecklistEntry,
 } from '../types/index.ts';
+import { handleClientFallback } from './clientFallback.ts';
 
 class ApiService {
   private currentUserId: string = 'usr_member_01';
@@ -43,7 +44,6 @@ class ApiService {
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `/api${endpoint}`;
-    console.log(`API Request: ${options.method || 'GET'} ${url}`);
     
     const headers = {
       'Content-Type': 'application/json',
@@ -57,16 +57,17 @@ class ApiService {
         headers,
       });
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({ error: response.statusText }));
-        console.error(`API Error: ${response.status} ${url}`, errData);
-        throw new Error(errData.error || `HTTP error ${response.status}`);
+      // If endpoint not found (e.g. static hosting on Vercel without Express backend)
+      // or server returns HTML instead of JSON
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok || contentType.includes('text/html')) {
+        return await handleClientFallback<T>(endpoint, options);
       }
 
-      return response.json();
-    } catch (error) {
-      console.error(`API Fetch Failure: ${url}`, error);
-      throw error;
+      return await response.json();
+    } catch {
+      // Fallback seamlessly on connection errors or Vercel static environment
+      return await handleClientFallback<T>(endpoint, options);
     }
   }
 

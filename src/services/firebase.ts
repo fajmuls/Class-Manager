@@ -1,6 +1,4 @@
-import { initializeApp } from 'firebase/app';
 import {
-  getAuth,
   signInWithPopup,
   GoogleAuthProvider,
   signOut,
@@ -8,12 +6,11 @@ import {
   onIdTokenChanged,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
+import { app, auth, db } from '../lib/firebase.ts';
 
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+export { app, auth, db };
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
